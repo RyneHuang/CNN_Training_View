@@ -109,6 +109,15 @@
   color: white;
 }
 
+.output-cell.current {
+  animation: pulse-current 0.5s ease-in-out;
+}
+
+@keyframes pulse-current {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.15); }
+}
+
 .kernel-section {
   text-align: center;
 }
@@ -217,4 +226,41 @@
 
 .replay-btn:hover {
   background: var(--primary-dark);
+}
+
+.controls {
+  display: flex;
+  justify-content: center;
+  gap: 1rem;
+  margin-top: 1.5rem;
+}
+
+.step-btn {
+  padding: 0.875rem 2rem;
+  background: var(--primary);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 1rem;
+  font-weight: 600;
+  transition: all 0.2s;
+}
+
+.step-btn:hover:not(:disabled) {
+  background: var(--primary-dark);
+  transform: translateY(-2px);
+}
+
+.step-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.step-btn.reset {
+  background: var(--secondary);
+}
+
+.step-btn.reset:hover {
+  opacity: 0.9;
 }

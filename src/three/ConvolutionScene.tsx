@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import './ConvolutionScene.css'
 
 interface ConvolutionSceneProps {
@@ -12,7 +12,7 @@ export default function ConvolutionScene({
   inputSize = 5,
   kernelSize = 3,
   stride = 1,
-  isAnimating = true
+  isAnimating = false
 }: ConvolutionSceneProps) {
   const [inputData, setInputData] = useState<number[][]>([])
   const [kernel, setKernel] = useState<number[][]>([])
@@ -20,8 +20,11 @@ export default function ConvolutionScene({
   const [currentPos, setCurrentPos] = useState<{ row: number; col: number } | null>(null)
   const [currentWindow, setCurrentWindow] = useState<number[][]>([])
   const [currentSum, setCurrentSum] = useState<number | null>(null)
+  const [isComplete, setIsComplete] = useState(false)
+  const stepCountRef = useRef(0)
 
   const outputSize = Math.floor((inputSize - kernelSize) / stride) + 1
+  const totalSteps = outputSize * outputSize
 
   useEffect(() => {
     const newInput: number[][] = []
@@ -47,73 +50,60 @@ export default function ConvolutionScene({
 
     setOutputData([])
     setCurrentPos(null)
+    setCurrentWindow([])
+    setCurrentSum(null)
+    setIsComplete(false)
+    stepCountRef.current = 0
   }, [inputSize, kernelSize])
 
-  const computeConvolution = useCallback(() => {
-    if (!isAnimating || inputData.length === 0) return
+  const computeNextStep = useCallback(() => {
+    if (inputData.length === 0 || outputData.length === totalSteps) return
 
-    let row = 0
-    let col = 0
+    const row = Math.floor(stepCountRef.current / outputSize)
+    const col = stepCountRef.current % outputSize
 
-    const step = () => {
-      if (row >= outputSize) {
-        setCurrentPos(null)
-        setCurrentWindow([])
-        setCurrentSum(null)
-        return
+    setCurrentPos({ row, col })
+
+    const window: number[][] = []
+    for (let ki = 0; ki < kernelSize; ki++) {
+      const wRow: number[] = []
+      for (let kj = 0; kj < kernelSize; kj++) {
+        wRow.push(inputData[row + ki]?.[col + kj] || 0)
       }
-
-      setCurrentPos({ row, col })
-
-      const window: number[][] = []
-      for (let ki = 0; ki < kernelSize; ki++) {
-        const wRow: number[] = []
-        for (let kj = 0; kj < kernelSize; kj++) {
-          wRow.push(inputData[row + ki]?.[col + kj] || 0)
-        }
-        window.push(wRow)
-      }
-      setCurrentWindow(window)
-
-      let sum = 0
-      for (let ki = 0; ki < kernelSize; ki++) {
-        for (let kj = 0; kj < kernelSize; kj++) {
-          sum += window[ki][kj] * kernel[ki][kj]
-        }
-      }
-      setCurrentSum(sum)
-
-      setTimeout(() => {
-        setOutputData(prev => {
-          const newOutput = [...prev]
-          if (!newOutput[row]) newOutput[row] = []
-          newOutput[row][col] = sum
-          return newOutput
-        })
-
-        col += stride
-        if (col >= outputSize) {
-          col = 0
-          row += stride
-        }
-
-        setTimeout(step, 300)
-      }, 400)
+      window.push(wRow)
     }
+    setCurrentWindow(window)
 
-    setTimeout(step, 300)
-  }, [inputData, kernel, isAnimating, kernelSize, stride, outputSize])
-
-  useEffect(() => {
-    if (isAnimating && inputData.length > 0) {
-      setOutputData([])
-      setTimeout(computeConvolution, 300)
-    } else {
-      setCurrentPos(null)
-      setCurrentWindow([])
-      setCurrentSum(null)
+    let sum = 0
+    for (let ki = 0; ki < kernelSize; ki++) {
+      for (let kj = 0; kj < kernelSize; kj++) {
+        sum += window[ki][kj] * kernel[ki][kj]
+      }
     }
-  }, [isAnimating])
+    setCurrentSum(sum)
+
+    setOutputData(prev => {
+      const newOutput = [...prev]
+      if (!newOutput[row]) newOutput[row] = []
+      newOutput[row][col] = sum
+      return newOutput
+    })
+
+    stepCountRef.current++
+
+    if (stepCountRef.current >= totalSteps) {
+      setIsComplete(true)
+    }
+  }, [inputData, kernel, kernelSize, outputSize, totalSteps])
+
+  const reset = () => {
+    setOutputData([])
+    setCurrentPos(null)
+    setCurrentWindow([])
+    setCurrentSum(null)
+    setIsComplete(false)
+    stepCountRef.current = 0
+  }
 
   const isInWindow = (r: number, c: number) => {
     if (!currentPos) return false
@@ -126,30 +116,25 @@ export default function ConvolutionScene({
   }
 
   const getCellColor = (value: number, min: number, max: number) => {
-    const ratio = (value - min) / (max - min || 1)
+    const ratio = (value - min) / (max || 1)
     const r = Math.round(34 + ratio * 200)
     const g = Math.round(197 - ratio * 100)
     const b = Math.round(246 - ratio * 150)
     return `rgb(${r}, ${g}, ${b})`
   }
 
-  const getSum = () => {
-    let s = 0
-    for (let i = 0; i < inputSize; i++) {
-      for (let j = 0; j < inputSize; j++) {
-        s += inputData[i][j]
-      }
-    }
-    return s
-  }
-
   const minInput = inputData.flat?.().length ? Math.min(...inputData.flat()) : 0
   const maxInput = inputData.flat?.().length ? Math.max(...inputData.flat()) : 10
+
+  const currentStep = stepCountRef.current
+  const remainingSteps = totalSteps - currentStep
 
   return (
     <div className="convolution-scene">
       <div className="convolution-info">
-        <div className="info-badge">卷积运算</div>
+        <div className="info-badge">
+          卷积运算 · 第 {currentStep} / {totalSteps} 步
+        </div>
         <div className="info-badge kernel-badge">
           卷积核: {kernel.map(row => row.join(',')).join(' | ')}
         </div>
@@ -215,7 +200,9 @@ export default function ConvolutionScene({
               </div>
             </div>
           ) : (
-            <div className="calculation-placeholder">等待计算...</div>
+            <div className="calculation-placeholder">
+              {isComplete ? '计算完成！' : '点击"下一步"开始'}
+            </div>
           )}
         </div>
 
@@ -224,7 +211,10 @@ export default function ConvolutionScene({
           <div className="grid output-grid">
             {Array(outputSize).fill(null).map((_, i) =>
               Array(outputSize).fill(null).map((_, j) => (
-                <div key={`out-${i}-${j}`} className={`cell output-cell ${outputData[i]?.[j] !== undefined ? 'filled' : ''}`}>
+                <div
+                  key={`out-${i}-${j}`}
+                  className={`cell output-cell ${outputData[i]?.[j] !== undefined ? 'filled' : ''} ${currentPos?.row === i && currentPos?.col === j ? 'current' : ''}`}
+                >
                   {outputData[i]?.[j] !== undefined ? outputData[i][j] : '?'}
                 </div>
               ))
@@ -233,14 +223,17 @@ export default function ConvolutionScene({
         </div>
       </div>
 
-      {!isAnimating && (
-        <button className="replay-btn" onClick={() => {
-          setOutputData([])
-          setTimeout(computeConvolution, 100)
-        }}>
-          ▶ 重播动画
-        </button>
-      )}
+      <div className="controls">
+        {!isComplete ? (
+          <button className="step-btn" onClick={computeNextStep} disabled={inputData.length === 0}>
+            ▶ 下一步 ({remainingSteps} 步剩余)
+          </button>
+        ) : (
+          <button className="step-btn reset" onClick={reset}>
+            ↻ 重置
+          </button>
+        )}
+      </div>
     </div>
   )
 }

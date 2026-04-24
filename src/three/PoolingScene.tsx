@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import './PoolingScene.css'
 
 interface PoolingSceneProps {
@@ -10,15 +10,18 @@ interface PoolingSceneProps {
 export default function PoolingScene({
   inputSize = 8,
   poolSize = 2,
-  isAnimating = true
+  isAnimating = false
 }: PoolingSceneProps) {
   const [inputData, setInputData] = useState<number[][]>([])
   const [outputData, setOutputData] = useState<number[][]>([])
   const [currentPos, setCurrentPos] = useState<{ row: number; col: number } | null>(null)
   const [currentWindow, setCurrentWindow] = useState<number[][]>([])
   const [currentMax, setCurrentMax] = useState<{ value: number; pos: { r: number; c: number } } | null>(null)
+  const [isComplete, setIsComplete] = useState(false)
+  const stepCountRef = useRef(0)
 
   const outputSize = inputSize / poolSize
+  const totalSteps = outputSize * outputSize
 
   useEffect(() => {
     const newInput: number[][] = []
@@ -32,76 +35,63 @@ export default function PoolingScene({
     setInputData(newInput)
     setOutputData([])
     setCurrentPos(null)
+    setCurrentWindow([])
+    setCurrentMax(null)
+    setIsComplete(false)
+    stepCountRef.current = 0
   }, [inputSize, poolSize])
 
-  const computePooling = useCallback(() => {
-    if (!isAnimating || inputData.length === 0) return
+  const computeNextStep = useCallback(() => {
+    if (inputData.length === 0 || stepCountRef.current >= totalSteps) return
 
-    let row = 0
-    let col = 0
+    const row = Math.floor(stepCountRef.current / outputSize)
+    const col = stepCountRef.current % outputSize
 
-    const step = () => {
-      if (row >= outputSize) {
-        setCurrentPos(null)
-        setCurrentWindow([])
-        setCurrentMax(null)
-        return
-      }
+    setCurrentPos({ row, col })
 
-      setCurrentPos({ row, col })
+    const window: number[][] = []
+    let maxVal = -Infinity
+    let maxR = row * poolSize
+    let maxC = col * poolSize
 
-      const window: number[][] = []
-      let maxVal = -Infinity
-      let maxR = row
-      let maxC = col
-
-      for (let pi = 0; pi < poolSize; pi++) {
-        const wRow: number[] = []
-        for (let pj = 0; pj < poolSize; pj++) {
-          const val = inputData[row * poolSize + pi]?.[col * poolSize + pj] || 0
-          wRow.push(val)
-          if (val > maxVal) {
-            maxVal = val
-            maxR = row * poolSize + pi
-            maxC = col * poolSize + pj
-          }
+    for (let pi = 0; pi < poolSize; pi++) {
+      const wRow: number[] = []
+      for (let pj = 0; pj < poolSize; pj++) {
+        const val = inputData[row * poolSize + pi]?.[col * poolSize + pj] || 0
+        wRow.push(val)
+        if (val > maxVal) {
+          maxVal = val
+          maxR = row * poolSize + pi
+          maxC = col * poolSize + pj
         }
-        window.push(wRow)
       }
-      setCurrentWindow(window)
-      setCurrentMax({ value: maxVal, pos: { r: maxR, c: maxC } })
-
-      setTimeout(() => {
-        setOutputData(prev => {
-          const newOutput = [...prev]
-          if (!newOutput[row]) newOutput[row] = []
-          newOutput[row][col] = maxVal
-          return newOutput
-        })
-
-        col++
-        if (col >= outputSize) {
-          col = 0
-          row++
-        }
-
-        setTimeout(step, 500)
-      }, 600)
+      window.push(wRow)
     }
+    setCurrentWindow(window)
+    setCurrentMax({ value: maxVal, pos: { r: maxR, c: maxC } })
 
-    setTimeout(step, 300)
-  }, [inputData, isAnimating, poolSize, outputSize])
+    setOutputData(prev => {
+      const newOutput = [...prev]
+      if (!newOutput[row]) newOutput[row] = []
+      newOutput[row][col] = maxVal
+      return newOutput
+    })
 
-  useEffect(() => {
-    if (isAnimating && inputData.length > 0) {
-      setOutputData([])
-      setTimeout(computePooling, 300)
-    } else {
-      setCurrentPos(null)
-      setCurrentWindow([])
-      setCurrentMax(null)
+    stepCountRef.current++
+
+    if (stepCountRef.current >= totalSteps) {
+      setIsComplete(true)
     }
-  }, [isAnimating])
+  }, [inputData, poolSize, outputSize, totalSteps])
+
+  const reset = () => {
+    setOutputData([])
+    setCurrentPos(null)
+    setCurrentWindow([])
+    setCurrentMax(null)
+    setIsComplete(false)
+    stepCountRef.current = 0
+  }
 
   const isInWindow = (r: number, c: number) => {
     if (!currentPos) return false
@@ -119,8 +109,7 @@ export default function PoolingScene({
     return currentMax?.pos.r === r && currentMax?.pos.c === c
   }
 
-  const getCellColor = (value: number, isHighlight: boolean = false) => {
-    if (isHighlight) return '#fbbf24'
+  const getCellColor = (value: number) => {
     const ratio = value / 9
     const r = Math.round(34 + ratio * 100)
     const g = Math.round(197 + ratio * 50)
@@ -128,10 +117,15 @@ export default function PoolingScene({
     return `rgb(${r}, ${g}, ${b})`
   }
 
+  const currentStep = stepCountRef.current
+  const remainingSteps = totalSteps - currentStep
+
   return (
     <div className="pooling-scene">
       <div className="pooling-info">
-        <div className="info-badge">Max Pooling</div>
+        <div className="info-badge">
+          Max Pooling · 第 {currentStep} / {totalSteps} 步
+        </div>
         <div className="info-badge">窗口: {poolSize}×{poolSize}</div>
       </div>
 
@@ -144,7 +138,7 @@ export default function PoolingScene({
                 <div
                   key={`${i}-${j}`}
                   className={`cell ${isInWindow(i, j) ? 'highlighted' : ''} ${isMax(i, j) ? 'max' : ''}`}
-                  style={{ backgroundColor: getCellColor(val, isMax(i, j)) }}
+                  style={{ backgroundColor: isMax(i, j) ? '#fbbf24' : getCellColor(val) }}
                 >
                   {val}
                 </div>
@@ -177,7 +171,9 @@ export default function PoolingScene({
               </div>
             </div>
           ) : (
-            <div className="calculation-placeholder">等待计算...</div>
+            <div className="calculation-placeholder">
+              {isComplete ? '计算完成！' : '点击"下一步"开始'}
+            </div>
           )}
         </div>
 
@@ -188,7 +184,7 @@ export default function PoolingScene({
               Array(outputSize).fill(null).map((_, j) => (
                 <div
                   key={`out-${i}-${j}`}
-                  className={`cell output-cell ${outputData[i]?.[j] !== undefined ? 'filled' : ''}`}
+                  className={`cell output-cell ${outputData[i]?.[j] !== undefined ? 'filled' : ''} ${currentPos?.row === i && currentPos?.col === j ? 'current' : ''}`}
                 >
                   {outputData[i]?.[j] !== undefined ? outputData[i][j] : '?'}
                 </div>
@@ -198,19 +194,17 @@ export default function PoolingScene({
         </div>
       </div>
 
-      <div className="pooling-explanation">
-        <p><strong>Max Pooling 原理：</strong>在每个 {poolSize}×{poolSize} 的窗口中，取最大值作为输出，实现降采样。</p>
-        <p>输出尺寸 = 输入尺寸 / 池化窗口尺寸 = {inputSize} / {poolSize} = {outputSize}</p>
+      <div className="controls">
+        {!isComplete ? (
+          <button className="step-btn" onClick={computeNextStep} disabled={inputData.length === 0}>
+            ▶ 下一步 ({remainingSteps} 步剩余)
+          </button>
+        ) : (
+          <button className="step-btn reset" onClick={reset}>
+            ↻ 重置
+          </button>
+        )}
       </div>
-
-      {!isAnimating && (
-        <button className="replay-btn" onClick={() => {
-          setOutputData([])
-          setTimeout(computePooling, 100)
-        }}>
-          ▶ 重播动画
-        </button>
-      )}
     </div>
   )
 }

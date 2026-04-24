@@ -95,6 +95,15 @@
   text-shadow: none;
 }
 
+.output-cell.current {
+  animation: pulse-current 0.5s ease-in-out;
+}
+
+@keyframes pulse-current {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.1); }
+}
+
 .calculation-section {
   text-align: center;
   min-width: 180px;
@@ -203,4 +212,37 @@
 
 .replay-btn:hover {
   opacity: 0.9;
+}
+
+.controls {
+  display: flex;
+  justify-content: center;
+  gap: 1rem;
+  margin-top: 1.5rem;
+}
+
+.step-btn {
+  padding: 0.875rem 2rem;
+  background: var(--accent);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 1rem;
+  font-weight: 600;
+  transition: all 0.2s;
+}
+
+.step-btn:hover:not(:disabled) {
+  opacity: 0.9;
+  transform: translateY(-2px);
+}
+
+.step-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.step-btn.reset {
+  background: var(--secondary);
 }
