@@ -47,16 +47,16 @@
 }
 
 .input-grid {
-  grid-template-columns: repeat(8, 40px);
+  /* gridTemplateColumns set dynamically via inline style */
 }
 
 .kernel-grid {
-  grid-template-columns: repeat(3, 40px);
+  /* gridTemplateColumns set dynamically via inline style */
   margin: 0 auto;
 }
 
 .output-grid {
-  grid-template-columns: repeat(4, 40px);
+  /* gridTemplateColumns set dynamically via inline style */
 }
 
 .cell {
