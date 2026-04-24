@@ -37,25 +37,28 @@ Max Pooling降采样的动态演示。
 
 ## 快速开始
 
-### 前端
+### 一键启动 (推荐)
+
+```bash
+# 安装前后端所有依赖，然后同时启动前端和后端
+npm install && npm start
+```
+
+> 一键启动会同时运行:
+> - 前端: http://localhost:3000
+> - 后端 API: http://localhost:8000
+
+### 前端 + 后端独立启动
 
 ```bash
 # 安装依赖
 npm install
 
-# 启动开发服务器 (http://localhost:3000)
+# 单独启动前端 (http://localhost:3000)
 npm run dev
-```
 
-### 后端
-
-```bash
-# 安装Python依赖
-cd backend
-pip install -r requirements.txt
-
-# 启动API服务器 (http://localhost:8000)
-python main.py
+# 单独启动后端 (http://localhost:8000)
+npm run backend
 ```
 
 ## 项目结构
