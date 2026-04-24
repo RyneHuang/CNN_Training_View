@@ -65,10 +65,10 @@
 }
 
 .hero-visual {
-  height: 400px;
   background: var(--surface);
   border-radius: 16px;
   overflow: hidden;
+  padding: 1rem;
 }
 
 .features {

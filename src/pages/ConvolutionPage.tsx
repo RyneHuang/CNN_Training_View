@@ -1,11 +1,9 @@
 import { useState } from 'react'
-import { Canvas } from '@react-three/fiber'
-import { OrbitControls } from '@react-three/drei'
 import ConvolutionScene from '../three/ConvolutionScene'
 import './ConvolutionPage.css'
 
 export default function ConvolutionPage() {
-  const [inputSize, setInputSize] = useState(8)
+  const [inputSize, setInputSize] = useState(5)
   const [kernelSize, setKernelSize] = useState(3)
   const [stride, setStride] = useState(1)
   const [isAnimating, setIsAnimating] = useState(true)
@@ -21,31 +19,12 @@ export default function ConvolutionPage() {
 
       <div className="content-grid">
         <div className="visualization">
-          <Canvas camera={{ position: [0, 0, 10], fov: 50 }}>
-            <OrbitControls />
-            <ambientLight intensity={0.5} />
-            <pointLight position={[10, 10, 10]} intensity={1} />
-            <ConvolutionScene
-              inputSize={inputSize}
-              kernelSize={kernelSize}
-              stride={stride}
-              isAnimating={isAnimating}
-            />
-          </Canvas>
-          <div className="legend">
-            <div className="legend-item">
-              <div className="legend-color input"></div>
-              <span>输入特征图</span>
-            </div>
-            <div className="legend-item">
-              <div className="legend-color kernel"></div>
-              <span>卷积核 (滑动窗口)</span>
-            </div>
-            <div className="legend-item">
-              <div className="legend-color output"></div>
-              <span>输出特征图</span>
-            </div>
-          </div>
+          <ConvolutionScene
+            inputSize={inputSize}
+            kernelSize={kernelSize}
+            stride={stride}
+            isAnimating={isAnimating}
+          />
         </div>
 
         <div className="controls-panel">
@@ -57,8 +36,8 @@ export default function ConvolutionPage() {
             <input
               type="range"
               min="4"
-              max="12"
-              step="2"
+              max="8"
+              step="1"
               value={inputSize}
               onChange={(e) => setInputSize(Number(e.target.value))}
             />
@@ -72,7 +51,7 @@ export default function ConvolutionPage() {
             <input
               type="range"
               min="2"
-              max="5"
+              max="4"
               step="1"
               value={kernelSize}
               onChange={(e) => setKernelSize(Number(e.target.value))}
@@ -111,17 +90,40 @@ export default function ConvolutionPage() {
               输出尺寸 = ⌊(输入尺寸 - 卷积核尺寸) / 步长⌋ + 1
             </code>
             <p className="result">
-              当前输出: <strong>{outputSize}×{outputSize}</strong>
+              当前: ⌊({inputSize} - {kernelSize}) / {stride}⌋ + 1 = <strong>{outputSize}</strong>
             </p>
           </div>
 
           <div className="info-card">
-            <h3>卷积运算示例</h3>
-            <p>
-              卷积核在每个位置与输入的局部区域进行逐元素乘法，
-              然后将结果相加得到一个输出值。这个过程就像用放大镜
-              在图像上逐处观察，提取特征。
-            </p>
+            <h3>卷积运算过程</h3>
+            <ol>
+              <li>卷积核在输入特征图上按步长滑动</li>
+              <li>对应位置元素相乘，然后求和</li>
+              <li>将结果填入输出特征图对应位置</li>
+              <li>重复直到遍历完整张图</li>
+            </ol>
+          </div>
+
+          <div className="info-card">
+            <h3>图例说明</h3>
+            <div className="legend-items">
+              <div className="legend-item">
+                <div className="legend-color blue"></div>
+                <span>输入特征图 (数字越大颜色越深)</span>
+              </div>
+              <div className="legend-item">
+                <div className="legend-color green"></div>
+                <span>卷积核正值</span>
+              </div>
+              <div className="legend-item">
+                <div className="legend-color red"></div>
+                <span>卷积核负值</span>
+              </div>
+              <div className="legend-item">
+                <div className="legend-color purple"></div>
+                <span>输出特征图</span>
+              </div>
+            </div>
           </div>
         </div>
       </div>

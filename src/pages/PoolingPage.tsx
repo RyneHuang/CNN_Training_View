@@ -1,6 +1,4 @@
 import { useState } from 'react'
-import { Canvas } from '@react-three/fiber'
-import { OrbitControls } from '@react-three/drei'
 import PoolingScene from '../three/PoolingScene'
 import './PoolingPage.css'
 
@@ -20,34 +18,11 @@ export default function PoolingPage() {
 
       <div className="content-grid">
         <div className="visualization">
-          <Canvas camera={{ position: [0, 0, 10], fov: 50 }}>
-            <OrbitControls />
-            <ambientLight intensity={0.5} />
-            <pointLight position={[10, 10, 10]} intensity={1} />
-            <PoolingScene
-              inputSize={inputSize}
-              poolSize={poolSize}
-              isAnimating={isAnimating}
-            />
-          </Canvas>
-          <div className="legend">
-            <div className="legend-item">
-              <div className="legend-color input"></div>
-              <span>输入</span>
-            </div>
-            <div className="legend-item">
-              <div className="legend-color window"></div>
-              <span>池化窗口</span>
-            </div>
-            <div className="legend-item">
-              <div className="legend-color highlight"></div>
-              <span>最大值位置</span>
-            </div>
-            <div className="legend-item">
-              <div className="legend-color output"></div>
-              <span>输出</span>
-            </div>
-          </div>
+          <PoolingScene
+            inputSize={inputSize}
+            poolSize={poolSize}
+            isAnimating={isAnimating}
+          />
         </div>
 
         <div className="controls-panel">
@@ -93,13 +68,21 @@ export default function PoolingPage() {
           </div>
 
           <div className="info-card">
-            <h3>Max Pooling 原理</h3>
+            <h3>输出尺寸计算</h3>
             <code>
-              输出 = max(池化窗口内的所有值)
+              输出尺寸 = 输入尺寸 / 池化窗口尺寸
             </code>
             <p className="result">
-              当前输出: <strong>{outputSize}×{outputSize}</strong>
+              当前: {inputSize} / {poolSize} = <strong>{outputSize}</strong>
             </p>
+          </div>
+
+          <div className="info-card">
+            <h3>Max Pooling 原理</h3>
+            <p>在每个池化窗口中，选择所有元素的最大值作为输出。</p>
+            <div className="formula">
+              <span>输出 = max(窗口内所有值)</span>
+            </div>
           </div>
 
           <div className="info-card">
@@ -113,15 +96,19 @@ export default function PoolingPage() {
           </div>
 
           <div className="info-card">
-            <h3>池化类型</h3>
-            <div className="pool-types">
-              <div className="pool-type">
-                <strong>Max Pooling</strong>
-                <span>取最大值，保留显著特征</span>
+            <h3>图例说明</h3>
+            <div className="legend-items">
+              <div className="legend-item">
+                <div className="legend-color blue"></div>
+                <span>输入特征图</span>
               </div>
-              <div className="pool-type">
-                <strong>Average Pooling</strong>
-                <span>取平均值，保留背景信息</span>
+              <div className="legend-item">
+                <div className="legend-color yellow"></div>
+                <span>当前窗口内的最大值</span>
+              </div>
+              <div className="legend-item">
+                <div className="legend-color purple"></div>
+                <span>输出</span>
               </div>
             </div>
           </div>

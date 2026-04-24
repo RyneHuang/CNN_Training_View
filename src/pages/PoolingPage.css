@@ -24,50 +24,7 @@
 .visualization {
   background: var(--surface);
   border-radius: 16px;
-  height: 500px;
-  position: relative;
-}
-
-.legend {
-  position: absolute;
-  bottom: 1rem;
-  left: 1rem;
-  display: flex;
-  gap: 1rem;
-  background: rgba(15, 23, 42, 0.9);
-  padding: 0.75rem 1rem;
-  border-radius: 8px;
-  flex-wrap: wrap;
-}
-
-.legend-item {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  font-size: 0.875rem;
-}
-
-.legend-color {
-  width: 16px;
-  height: 16px;
-  border-radius: 4px;
-}
-
-.legend-color.input {
-  background: linear-gradient(135deg, #3b82f6, #06b6d4);
-}
-
-.legend-color.window {
-  background: #22d3ee;
-  border: 2px solid #22d3ee;
-}
-
-.legend-color.highlight {
-  background: #fbbf24;
-}
-
-.legend-color.output {
-  background: linear-gradient(135deg, #8b5cf6, #6366f1);
+  overflow: auto;
 }
 
 .controls-panel {
@@ -147,6 +104,7 @@
   border-radius: 6px;
   font-size: 0.875rem;
   margin-bottom: 0.75rem;
+  font-family: monospace;
 }
 
 .info-card .result {
@@ -157,6 +115,22 @@
   color: var(--accent);
 }
 
+.info-card p {
+  color: var(--text-muted);
+  font-size: 0.9375rem;
+  line-height: 1.6;
+}
+
+.info-card .formula {
+  margin-top: 0.75rem;
+  padding: 0.75rem;
+  background: var(--background);
+  border-radius: 6px;
+  text-align: center;
+  font-family: monospace;
+  color: var(--text);
+}
+
 .info-card ul {
   color: var(--text-muted);
   padding-left: 1.25rem;
@@ -164,26 +138,34 @@
   line-height: 1.8;
 }
 
-.pool-types {
+.legend-items {
   display: flex;
   flex-direction: column;
+  gap: 0.5rem;
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
   gap: 0.75rem;
-}
-
-.pool-type {
-  display: flex;
-  flex-direction: column;
-  padding: 0.75rem;
-  background: var(--background);
-  border-radius: 6px;
-}
-
-.pool-type strong {
-  color: var(--text);
-  margin-bottom: 0.25rem;
-}
-
-.pool-type span {
-  color: var(--text-muted);
   font-size: 0.875rem;
+  color: var(--text-muted);
+}
+
+.legend-color {
+  width: 20px;
+  height: 20px;
+  border-radius: 4px;
+}
+
+.legend-color.blue {
+  background: linear-gradient(135deg, #3b82f6, #06b6d4);
+}
+
+.legend-color.yellow {
+  background: #fbbf24;
+}
+
+.legend-color.purple {
+  background: var(--secondary);
 }

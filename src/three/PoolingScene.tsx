@@ -1,6 +1,5 @@
-import { useRef, useMemo } from 'react'
-import { useFrame } from '@react-three/fiber'
-import * as THREE from 'three'
+import { useState, useEffect, useCallback } from 'react'
+import './PoolingScene.css'
 
 interface PoolingSceneProps {
   inputSize?: number
@@ -13,148 +12,205 @@ export default function PoolingScene({
   poolSize = 2,
   isAnimating = true
 }: PoolingSceneProps) {
-  const groupRef = useRef<THREE.Group>(null)
-  const windowRef = useRef<THREE.Mesh>(null)
-  const highlightRef = useRef<THREE.Mesh>(null)
-  const progressRef = useRef(0)
-
-  const inputData = useMemo(() => {
-    const data: number[][] = []
-    for (let i = 0; i < inputSize; i++) {
-      const row: number[] = []
-      for (let j = 0; j < inputSize; j++) {
-        row.push(Math.random())
-      }
-      data.push(row)
-    }
-    return data
-  }, [inputSize])
+  const [inputData, setInputData] = useState<number[][]>([])
+  const [outputData, setOutputData] = useState<number[][]>([])
+  const [currentPos, setCurrentPos] = useState<{ row: number; col: number } | null>(null)
+  const [currentWindow, setCurrentWindow] = useState<number[][]>([])
+  const [currentMax, setCurrentMax] = useState<{ value: number; pos: { r: number; c: number } } | null>(null)
 
   const outputSize = inputSize / poolSize
 
-  const inputCubes = useMemo(() => {
-    const meshes: { position: [number, number, number]; value: number }[] = []
-    const offset = (inputSize - 1) / 2
+  useEffect(() => {
+    const newInput: number[][] = []
     for (let i = 0; i < inputSize; i++) {
+      const row: number[] = []
       for (let j = 0; j < inputSize; j++) {
-        meshes.push({
-          position: [j - offset, inputSize - i - offset, 0],
-          value: inputData[i][j]
-        })
+        row.push(Math.floor(Math.random() * 9) + 1)
       }
+      newInput.push(row)
     }
-    return meshes
-  }, [inputData, inputSize])
+    setInputData(newInput)
+    setOutputData([])
+    setCurrentPos(null)
+  }, [inputSize, poolSize])
 
-  const outputCubes = useMemo(() => {
-    const meshes: { position: [number, number, number]; value: number; isHighlight: boolean }[] = []
-    const outOffset = (outputSize - 1) / 2
-    for (let i = 0; i < outputSize; i++) {
-      for (let j = 0; j < outputSize; j++) {
-        meshes.push({
-          position: [j - outOffset, outputSize - i - outOffset, -2],
-          value: 0,
-          isHighlight: false
-        })
+  const computePooling = useCallback(() => {
+    if (!isAnimating || inputData.length === 0) return
+
+    let row = 0
+    let col = 0
+
+    const step = () => {
+      if (row >= outputSize) {
+        setCurrentPos(null)
+        setCurrentWindow([])
+        setCurrentMax(null)
+        return
       }
-    }
-    return meshes
-  }, [outputSize])
 
-  useFrame((_, delta) => {
-    if (isAnimating && windowRef.current && highlightRef.current && groupRef.current) {
-      progressRef.current += delta * 0.8
-      const maxSteps = outputSize * outputSize
-      const currentStep = Math.floor(progressRef.current % maxSteps)
+      setCurrentPos({ row, col })
 
-      const outRow = Math.floor(currentStep / outputSize)
-      const outCol = currentStep % outputSize
+      const window: number[][] = []
+      let maxVal = -Infinity
+      let maxR = row
+      let maxC = col
 
-      const startI = outRow * poolSize
-      const startJ = outCol * poolSize
-
-      windowRef.current.position.x = startJ + (poolSize - 1) / 2 - (inputSize - 1) / 2
-      windowRef.current.position.y = (inputSize - 1) / 2 - (startI + (poolSize - 1) / 2)
-
-      let maxVal = 0
-      let maxI = startI, maxJ = startJ
       for (let pi = 0; pi < poolSize; pi++) {
+        const wRow: number[] = []
         for (let pj = 0; pj < poolSize; pj++) {
-          const val = inputData[startI + pi]?.[startJ + pj] || 0
+          const val = inputData[row * poolSize + pi]?.[col * poolSize + pj] || 0
+          wRow.push(val)
           if (val > maxVal) {
             maxVal = val
-            maxI = startI + pi
-            maxJ = startJ + pj
+            maxR = row * poolSize + pi
+            maxC = col * poolSize + pj
           }
         }
+        window.push(wRow)
       }
-
-      highlightRef.current.position.x = maxJ - (inputSize - 1) / 2
-      highlightRef.current.position.y = (inputSize - 1) / 2 - maxI
-
-      outputCubes[currentStep].value = maxVal
-      outputCubes[currentStep].isHighlight = true
+      setCurrentWindow(window)
+      setCurrentMax({ value: maxVal, pos: { r: maxR, c: maxC } })
 
       setTimeout(() => {
-        if (outputCubes[currentStep]) {
-          outputCubes[currentStep].isHighlight = false
-        }
-      }, 300)
-    }
-  })
+        setOutputData(prev => {
+          const newOutput = [...prev]
+          if (!newOutput[row]) newOutput[row] = []
+          newOutput[row][col] = maxVal
+          return newOutput
+        })
 
-  const getColor = (value: number, isHighlight = false) => {
-    if (isHighlight) return new THREE.Color(1, 0.8, 0)
-    return new THREE.Color(value * 0.3, value * 0.7, value)
+        col++
+        if (col >= outputSize) {
+          col = 0
+          row++
+        }
+
+        setTimeout(step, 500)
+      }, 600)
+    }
+
+    setTimeout(step, 300)
+  }, [inputData, isAnimating, poolSize, outputSize])
+
+  useEffect(() => {
+    if (isAnimating && inputData.length > 0) {
+      setOutputData([])
+      setTimeout(computePooling, 300)
+    } else {
+      setCurrentPos(null)
+      setCurrentWindow([])
+      setCurrentMax(null)
+    }
+  }, [isAnimating])
+
+  const isInWindow = (r: number, c: number) => {
+    if (!currentPos) return false
+    const startR = currentPos.row * poolSize
+    const startC = currentPos.col * poolSize
+    return (
+      r >= startR &&
+      r < startR + poolSize &&
+      c >= startC &&
+      c < startC + poolSize
+    )
+  }
+
+  const isMax = (r: number, c: number) => {
+    return currentMax?.pos.r === r && currentMax?.pos.c === c
+  }
+
+  const getCellColor = (value: number, isHighlight: boolean = false) => {
+    if (isHighlight) return '#fbbf24'
+    const ratio = value / 9
+    const r = Math.round(34 + ratio * 100)
+    const g = Math.round(197 + ratio * 50)
+    const b = Math.round(246 - ratio * 100)
+    return `rgb(${r}, ${g}, ${b})`
   }
 
   return (
-    <group ref={groupRef}>
-      {inputCubes.map((cube, idx) => (
-        <mesh key={idx} position={[cube.position[0], cube.position[1], cube.position[2]]}>
-          <boxGeometry args={[0.9, 0.9, 0.9]} />
-          <meshStandardMaterial
-            color={getColor(cube.value)}
-            transparent
-            opacity={0.8}
-          />
-        </mesh>
-      ))}
+    <div className="pooling-scene">
+      <div className="pooling-info">
+        <div className="info-badge">Max Pooling</div>
+        <div className="info-badge">窗口: {poolSize}×{poolSize}</div>
+      </div>
 
-      <mesh ref={windowRef} position={[0, 0, 1]}>
-        <boxGeometry args={[poolSize * 0.95, poolSize * 0.95, 0.2]} />
-        <meshStandardMaterial
-          color="#22d3ee"
-          transparent
-          opacity={0.3}
-          wireframe
-        />
-      </mesh>
+      <div className="grids-container">
+        <div className="grid-section">
+          <h4>输入 ({inputSize}×{inputSize})</h4>
+          <div className="grid input-grid" style={{ gridTemplateColumns: `repeat(${inputSize}, 36px)` }}>
+            {inputData.map((row, i) =>
+              row.map((val, j) => (
+                <div
+                  key={`${i}-${j}`}
+                  className={`cell ${isInWindow(i, j) ? 'highlighted' : ''} ${isMax(i, j) ? 'max' : ''}`}
+                  style={{ backgroundColor: getCellColor(val, isMax(i, j)) }}
+                >
+                  {val}
+                </div>
+              ))
+            )}
+          </div>
+        </div>
 
-      <mesh ref={highlightRef} position={[0, 0, 0.5]}>
-        <boxGeometry args={[0.85, 0.85, 1]} />
-        <meshStandardMaterial
-          color="#fbbf24"
-          transparent
-          opacity={0.4}
-        />
-      </mesh>
+        <div className="calculation-section">
+          <h4>当前窗口</h4>
+          {currentWindow.length > 0 ? (
+            <div className="calculation-box">
+              <div className="window-display">
+                {currentWindow.map((row, i) => (
+                  <div key={i} className="window-row">
+                    {row.map((val, j) => (
+                      <span
+                        key={j}
+                        className={`window-val ${isMax(currentPos!.row * poolSize + i, currentPos!.col * poolSize + j) ? 'max' : ''}`}
+                      >
+                        {val}
+                      </span>
+                    ))}
+                  </div>
+                ))}
+              </div>
+              <div className="max-result">
+                <span className="max-label">Max:</span>
+                <span className="max-value">{currentMax?.value}</span>
+              </div>
+            </div>
+          ) : (
+            <div className="calculation-placeholder">等待计算...</div>
+          )}
+        </div>
 
-      {outputCubes.map((cube, idx) => (
-        <mesh key={idx} position={[cube.position[0], cube.position[1], cube.position[2]]}>
-          <boxGeometry args={[0.85, 0.85, 0.5]} />
-          <meshStandardMaterial
-            color={getColor(cube.value, cube.isHighlight)}
-            transparent
-            opacity={0.9}
-            emissive={cube.isHighlight ? "#fbbf24" : "#000000"}
-            emissiveIntensity={cube.isHighlight ? 0.5 : 0}
-          />
-        </mesh>
-      ))}
+        <div className="grid-section">
+          <h4>输出 ({outputSize}×{outputSize})</h4>
+          <div className="grid output-grid" style={{ gridTemplateColumns: `repeat(${outputSize}, 48px)` }}>
+            {Array(outputSize).fill(null).map((_, i) =>
+              Array(outputSize).fill(null).map((_, j) => (
+                <div
+                  key={`out-${i}-${j}`}
+                  className={`cell output-cell ${outputData[i]?.[j] !== undefined ? 'filled' : ''}`}
+                >
+                  {outputData[i]?.[j] !== undefined ? outputData[i][j] : '?'}
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+      </div>
 
-      <ambientLight intensity={0.5} />
-      <pointLight position={[10, 10, 10]} intensity={1} />
-    </group>
+      <div className="pooling-explanation">
+        <p><strong>Max Pooling 原理：</strong>在每个 {poolSize}×{poolSize} 的窗口中，取最大值作为输出，实现降采样。</p>
+        <p>输出尺寸 = 输入尺寸 / 池化窗口尺寸 = {inputSize} / {poolSize} = {outputSize}</p>
+      </div>
+
+      {!isAnimating && (
+        <button className="replay-btn" onClick={() => {
+          setOutputData([])
+          setTimeout(computePooling, 100)
+        }}>
+          ▶ 重播动画
+        </button>
+      )}
+    </div>
   )
 }

@@ -1,6 +1,5 @@
-import { useRef, useMemo } from 'react'
-import { useFrame } from '@react-three/fiber'
-import * as THREE from 'three'
+import { useState, useEffect, useCallback } from 'react'
+import './ConvolutionScene.css'
 
 interface ConvolutionSceneProps {
   inputSize?: number
@@ -10,138 +9,238 @@ interface ConvolutionSceneProps {
 }
 
 export default function ConvolutionScene({
-  inputSize = 8,
+  inputSize = 5,
   kernelSize = 3,
   stride = 1,
   isAnimating = true
 }: ConvolutionSceneProps) {
-  const groupRef = useRef<THREE.Group>(null)
-  const filterRef = useRef<THREE.Mesh>(null)
-  const progressRef = useRef(0)
+  const [inputData, setInputData] = useState<number[][]>([])
+  const [kernel, setKernel] = useState<number[][]>([])
+  const [outputData, setOutputData] = useState<number[][]>([])
+  const [currentPos, setCurrentPos] = useState<{ row: number; col: number } | null>(null)
+  const [currentWindow, setCurrentWindow] = useState<number[][]>([])
+  const [currentSum, setCurrentSum] = useState<number | null>(null)
 
-  const { inputData, outputSize } = useMemo(() => {
-    const data: number[][] = []
+  const outputSize = Math.floor((inputSize - kernelSize) / stride) + 1
+
+  useEffect(() => {
+    const newInput: number[][] = []
     for (let i = 0; i < inputSize; i++) {
       const row: number[] = []
       for (let j = 0; j < inputSize; j++) {
-        const dist = Math.sqrt((i - inputSize/2)**2 + (j - inputSize/2)**2)
-        row.push(Math.max(0, 1 - dist / (inputSize/2)))
+        const val = Math.round(Math.sin(i * 0.8) * Math.cos(j * 0.8) * 4 + 5)
+        row.push(val)
       }
-      data.push(row)
+      newInput.push(row)
     }
-    const outSize = Math.floor((inputSize - kernelSize) / stride) + 1
-    return { inputData: data, outputSize: outSize }
-  }, [inputSize, kernelSize, stride])
+    setInputData(newInput)
 
-  const cubes = useMemo(() => {
-    const meshes: { position: [number, number, number]; value: number }[] = []
-    const offset = (inputSize - 1) / 2
-    for (let i = 0; i < inputSize; i++) {
-      for (let j = 0; j < inputSize; j++) {
-        meshes.push({
-          position: [j - offset, inputSize - i - offset, 0],
-          value: inputData[i][j]
-        })
+    const newKernel: number[][] = []
+    for (let i = 0; i < kernelSize; i++) {
+      const row: number[] = []
+      for (let j = 0; j < kernelSize; j++) {
+        row.push(Math.random() > 0.5 ? 1 : -1)
       }
+      newKernel.push(row)
     }
-    return meshes
-  }, [inputData, inputSize])
+    setKernel(newKernel)
 
-  const outputCubes = useMemo(() => {
-    const meshes: { position: [number, number, number]; value: number }[] = []
-    const outOffset = (outputSize - 1) / 2
-    for (let i = 0; i < outputSize; i++) {
-      for (let j = 0; j < outputSize; j++) {
-        meshes.push({
-          position: [j - outOffset, outputSize - i - outOffset, -2 - (i * outputSize + j) * 0.01],
-          value: 0.5
-        })
+    setOutputData([])
+    setCurrentPos(null)
+  }, [inputSize, kernelSize])
+
+  const computeConvolution = useCallback(() => {
+    if (!isAnimating || inputData.length === 0) return
+
+    let row = 0
+    let col = 0
+
+    const step = () => {
+      if (row >= outputSize) {
+        setCurrentPos(null)
+        setCurrentWindow([])
+        setCurrentSum(null)
+        return
       }
-    }
-    return meshes
-  }, [outputSize])
 
-  useFrame((_, delta) => {
-    if (isAnimating && filterRef.current && groupRef.current) {
-      progressRef.current += delta * 0.5
-      const maxSteps = outputSize * outputSize
-      const currentStep = Math.floor(progressRef.current % maxSteps)
+      setCurrentPos({ row, col })
 
-      const outRow = Math.floor(currentStep / outputSize)
-      const outCol = currentStep % outputSize
-
-      const startI = outRow * stride
-      const startJ = outCol * stride
-
-      filterRef.current.position.x = startJ - (inputSize - 1) / 2
-      filterRef.current.position.y = (inputSize - 1) / 2 - startI
-
-      filterRef.current.visible = true
+      const window: number[][] = []
+      for (let ki = 0; ki < kernelSize; ki++) {
+        const wRow: number[] = []
+        for (let kj = 0; kj < kernelSize; kj++) {
+          wRow.push(inputData[row + ki]?.[col + kj] || 0)
+        }
+        window.push(wRow)
+      }
+      setCurrentWindow(window)
 
       let sum = 0
       for (let ki = 0; ki < kernelSize; ki++) {
         for (let kj = 0; kj < kernelSize; kj++) {
-          const ii = startI + ki
-          const jj = startJ + kj
-          if (ii < inputSize && jj < inputSize) {
-            sum += inputData[ii][jj]
-          }
+          sum += window[ki][kj] * kernel[ki][kj]
         }
       }
+      setCurrentSum(sum)
 
-      const avgSum = sum / (kernelSize * kernelSize)
-      outputCubes[outRow * outputSize + outCol].value = avgSum
+      setTimeout(() => {
+        setOutputData(prev => {
+          const newOutput = [...prev]
+          if (!newOutput[row]) newOutput[row] = []
+          newOutput[row][col] = sum
+          return newOutput
+        })
+
+        col += stride
+        if (col >= outputSize) {
+          col = 0
+          row += stride
+        }
+
+        setTimeout(step, 300)
+      }, 400)
     }
-  })
 
-  const getColor = (value: number) => {
-    const r = value
-    const g = value * 0.5
-    const b = 1 - value * 0.3
-    return new THREE.Color(r, g, b)
+    setTimeout(step, 300)
+  }, [inputData, kernel, isAnimating, kernelSize, stride, outputSize])
+
+  useEffect(() => {
+    if (isAnimating && inputData.length > 0) {
+      setOutputData([])
+      setTimeout(computeConvolution, 300)
+    } else {
+      setCurrentPos(null)
+      setCurrentWindow([])
+      setCurrentSum(null)
+    }
+  }, [isAnimating])
+
+  const isInWindow = (r: number, c: number) => {
+    if (!currentPos) return false
+    return (
+      r >= currentPos.row &&
+      r < currentPos.row + kernelSize &&
+      c >= currentPos.col &&
+      c < currentPos.col + kernelSize
+    )
   }
 
+  const getCellColor = (value: number, min: number, max: number) => {
+    const ratio = (value - min) / (max - min || 1)
+    const r = Math.round(34 + ratio * 200)
+    const g = Math.round(197 - ratio * 100)
+    const b = Math.round(246 - ratio * 150)
+    return `rgb(${r}, ${g}, ${b})`
+  }
+
+  const getSum = () => {
+    let s = 0
+    for (let i = 0; i < inputSize; i++) {
+      for (let j = 0; j < inputSize; j++) {
+        s += inputData[i][j]
+      }
+    }
+    return s
+  }
+
+  const minInput = inputData.flat?.().length ? Math.min(...inputData.flat()) : 0
+  const maxInput = inputData.flat?.().length ? Math.max(...inputData.flat()) : 10
+
   return (
-    <group ref={groupRef}>
-      {cubes.map((cube, idx) => (
-        <mesh key={idx} position={[cube.position[0], cube.position[1], cube.position[2]]}>
-          <boxGeometry args={[0.9, 0.9, 0.9]} />
-          <meshStandardMaterial
-            color={getColor(cube.value)}
-            transparent
-            opacity={0.8}
-          />
-        </mesh>
-      ))}
+    <div className="convolution-scene">
+      <div className="convolution-info">
+        <div className="info-badge">卷积运算</div>
+        <div className="info-badge kernel-badge">
+          卷积核: {kernel.map(row => row.join(',')).join(' | ')}
+        </div>
+      </div>
 
-      <mesh ref={filterRef} position={[0, 0, 1]}>
-        <boxGeometry args={[kernelSize * 0.95, kernelSize * 0.95, 0.3]} />
-        <meshStandardMaterial
-          color="#fbbf24"
-          transparent
-          opacity={0.6}
-          wireframe
-        />
-      </mesh>
+      <div className="grids-container">
+        <div className="grid-section">
+          <h4>输入特征图 ({inputSize}×{inputSize})</h4>
+          <div className="grid input-grid">
+            {inputData.map((row, i) =>
+              row.map((val, j) => (
+                <div
+                  key={`${i}-${j}`}
+                  className={`cell ${isInWindow(i, j) ? 'highlighted' : ''}`}
+                  style={{ backgroundColor: getCellColor(val, minInput, maxInput) }}
+                >
+                  {val}
+                </div>
+              ))
+            )}
+          </div>
+        </div>
 
-      <mesh position={[0, 0, -2]}>
-        <boxGeometry args={[outputSize * 0.9, outputSize * 0.9, 0.1]} />
-        <meshStandardMaterial color="#6366f1" opacity={0.3} transparent />
-      </mesh>
+        <div className="kernel-section">
+          <h4>卷积核 ({kernelSize}×{kernelSize})</h4>
+          <div className="grid kernel-grid">
+            {kernel.map((row, i) =>
+              row.map((val, j) => (
+                <div key={`${i}-${j}`} className={`cell kernel-cell ${val > 0 ? 'positive' : 'negative'}`}>
+                  {val}
+                </div>
+              ))
+            )}
+          </div>
+        </div>
 
-      {outputCubes.map((cube, idx) => (
-        <mesh key={idx} position={[cube.position[0], cube.position[1], cube.position[2]]}>
-          <boxGeometry args={[0.85, 0.85, 0.5]} />
-          <meshStandardMaterial
-            color={getColor(cube.value)}
-            transparent
-            opacity={0.9}
-          />
-        </mesh>
-      ))}
+        <div className="calculation-section">
+          <h4>当前计算</h4>
+          {currentWindow.length > 0 ? (
+            <div className="calculation-box">
+              <div className="window-display">
+                <div className="window-grid">
+                  {currentWindow.map((row, i) =>
+                    <div key={i} className="window-row">
+                      {row.map((val, j) => (
+                        <span key={j} className="window-val">{val}</span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+                <span className="multiply">×</span>
+                <div className="window-grid kernel-display">
+                  {kernel.map((row, i) =>
+                    <div key={i} className="window-row">
+                      {row.map((val, j) => (
+                        <span key={j} className={`window-val ${val > 0 ? 'positive' : 'negative'}`}>{val}</span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+                <span className="equals">=</span>
+                <span className="result">{currentSum}</span>
+              </div>
+            </div>
+          ) : (
+            <div className="calculation-placeholder">等待计算...</div>
+          )}
+        </div>
 
-      <ambientLight intensity={0.5} />
-      <pointLight position={[10, 10, 10]} intensity={1} />
-    </group>
+        <div className="grid-section">
+          <h4>输出特征图 ({outputSize}×{outputSize})</h4>
+          <div className="grid output-grid">
+            {Array(outputSize).fill(null).map((_, i) =>
+              Array(outputSize).fill(null).map((_, j) => (
+                <div key={`out-${i}-${j}`} className={`cell output-cell ${outputData[i]?.[j] !== undefined ? 'filled' : ''}`}>
+                  {outputData[i]?.[j] !== undefined ? outputData[i][j] : '?'}
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+      </div>
+
+      {!isAnimating && (
+        <button className="replay-btn" onClick={() => {
+          setOutputData([])
+          setTimeout(computeConvolution, 100)
+        }}>
+          ▶ 重播动画
+        </button>
+      )}
+    </div>
   )
 }
