@@ -132,7 +132,7 @@ export default function PoolingScene({
       <div className="grids-container">
         <div className="grid-section">
           <h4>输入 ({inputSize}×{inputSize})</h4>
-          <div className="grid input-grid" style={{ gridTemplateColumns: `repeat(${inputSize}, 36px)` }}>
+          <div className="grid input-grid" style={{ gridTemplateColumns: `repeat(${inputSize}, 32px)` }}>
             {inputData.map((row, i) =>
               row.map((val, j) => (
                 <div
@@ -179,7 +179,7 @@ export default function PoolingScene({
 
         <div className="grid-section">
           <h4>输出 ({outputSize}×{outputSize})</h4>
-          <div className="grid output-grid" style={{ gridTemplateColumns: `repeat(${outputSize}, 48px)` }}>
+          <div className="grid output-grid" style={{ gridTemplateColumns: `repeat(${outputSize}, 40px)` }}>
             {Array(outputSize).fill(null).map((_, i) =>
               Array(outputSize).fill(null).map((_, j) => (
                 <div

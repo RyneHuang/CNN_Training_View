@@ -143,7 +143,7 @@ export default function ConvolutionScene({
       <div className="grids-container">
         <div className="grid-section">
           <h4>输入特征图 ({inputSize}×{inputSize})</h4>
-          <div className="grid input-grid" style={{ gridTemplateColumns: `repeat(${inputSize}, 40px)` }}>
+          <div className="grid input-grid" style={{ gridTemplateColumns: `repeat(${inputSize}, 36px)` }}>
             {inputData.map((row, i) =>
               row.map((val, j) => (
                 <div
@@ -160,7 +160,7 @@ export default function ConvolutionScene({
 
         <div className="kernel-section">
           <h4>卷积核 ({kernelSize}×{kernelSize})</h4>
-          <div className="grid kernel-grid" style={{ gridTemplateColumns: `repeat(${kernelSize}, 40px)` }}>
+          <div className="grid kernel-grid" style={{ gridTemplateColumns: `repeat(${kernelSize}, 36px)` }}>
             {kernel.map((row, i) =>
               row.map((val, j) => (
                 <div key={`${i}-${j}`} className={`cell kernel-cell ${val > 0 ? 'positive' : 'negative'}`}>
@@ -208,7 +208,7 @@ export default function ConvolutionScene({
 
         <div className="grid-section">
           <h4>输出特征图 ({outputSize}×{outputSize})</h4>
-          <div className="grid output-grid" style={{ gridTemplateColumns: `repeat(${outputSize}, 40px)` }}>
+          <div className="grid output-grid" style={{ gridTemplateColumns: `repeat(${outputSize}, 36px)` }}>
             {Array(outputSize).fill(null).map((_, i) =>
               Array(outputSize).fill(null).map((_, j) => (
                 <div
