@@ -1,0 +1,32 @@
+# Dependencies
+node_modules
+__pycache__
+*.pyc
+.env
+.venv
+venv
+
+# Build
+dist
+build
+*.egg-info
+
+# IDE
+.idea
+.vscode
+*.swp
+*.swo
+
+# Logs
+*.log
+npm-debug.log*
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Uploads
+uploads/
+data/raw/
+models/*.pth
+models/*.pt
