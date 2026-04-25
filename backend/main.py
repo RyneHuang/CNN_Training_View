@@ -11,9 +11,17 @@ import time
 import numpy as np
 from contextlib import asynccontextmanager
 
-# GPU support
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+# GPU support (CUDA for NVIDIA, MPS for Apple Silicon)
+if torch.cuda.is_available():
+    device = torch.device("cuda")
+elif torch.backends.mps.is_available():
+    device = torch.device("mps")
+else:
+    device = torch.device("cpu")
 print(f"Using device: {device}")
+
+# Optimize CPU multi-threading
+torch.set_num_threads(6)
 
 # Multi-tenancy: store models and training state per tenant
 tenant_states: Dict[str, Dict[str, Any]] = {}
@@ -92,7 +100,15 @@ def get_train_loader(dataset_name: str, batch_size: int):
     elif dataset_name == "cifar10":
         dataset = datasets.CIFAR10('./data', train=True, download=True, transform=config["transform"])
 
-    loader = torch.utils.data.DataLoader(dataset, batch_size=batch_size, shuffle=True)
+    # Optimized DataLoader with multiprocessing
+    loader = torch.utils.data.DataLoader(
+        dataset,
+        batch_size=batch_size,
+        shuffle=True,
+        num_workers=4,  # Parallel data loading
+        persistent_workers=True,  # Keep workers alive
+        pin_memory=True if device.type != "cpu" else False  # Faster GPU transfer
+    )
     train_loaders[cache_key] = loader
     return loader
 
@@ -111,7 +127,14 @@ def get_val_loader(dataset_name: str, batch_size: int = 10):
     elif dataset_name == "cifar10":
         dataset = datasets.CIFAR10('./data', train=False, download=True, transform=config["transform"])
 
-    loader = torch.utils.data.DataLoader(dataset, batch_size=batch_size, shuffle=False)
+    loader = torch.utils.data.DataLoader(
+        dataset,
+        batch_size=batch_size,
+        shuffle=False,
+        num_workers=4,
+        persistent_workers=True,
+        pin_memory=True if device.type != "cpu" else False
+    )
     val_loaders[cache_key] = loader
     return loader
 

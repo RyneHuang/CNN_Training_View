@@ -86,7 +86,7 @@ const defaultConfig: CNNConfig = {
   ],
   optimizer: 'adam',
   learningRate: 0.003,  // 配合 CosineAnnealing 学习率调度器
-  batchSize: 128,
+  batchSize: 256,  // 更大的 batch size 加快训练
   epochs: 50
 }
 
