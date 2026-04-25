@@ -14,11 +14,14 @@ from contextlib import asynccontextmanager
 # GPU support (CUDA for NVIDIA, MPS for Apple Silicon)
 if torch.cuda.is_available():
     device = torch.device("cuda")
+    print(f"GPU detected: {torch.cuda.get_device_name(0)}")
 elif torch.backends.mps.is_available():
     device = torch.device("mps")
+    print("Using Apple Silicon GPU (MPS)")
 else:
     device = torch.device("cpu")
-print(f"Using device: {device}")
+    print("No GPU detected, using CPU")
+print(f"Active device: {device}")
 
 # Optimize CPU multi-threading
 torch.set_num_threads(6)
@@ -85,11 +88,14 @@ class CreateModelRequest(BaseModel):
 train_loaders: Dict[str, torch.utils.data.DataLoader] = {}
 val_loaders: Dict[str, torch.utils.data.DataLoader] = {}
 
-def get_train_loader(dataset_name: str, batch_size: int):
+def get_train_loader(dataset_name: str, batch_size: int, tenant_id: str = None):
+    """Get DataLoader for a specific tenant to ensure isolation."""
     if dataset_name not in DATASET_CONFIGS:
         raise ValueError(f"Unknown dataset: {dataset_name}")
 
-    cache_key = f"{dataset_name}_{batch_size}"
+    # Each tenant gets their own DataLoader for training isolation
+    cache_key = f"{dataset_name}_{batch_size}_{tenant_id or 'default'}"
+
     if cache_key in train_loaders:
         return train_loaders[cache_key]
 
@@ -208,7 +214,9 @@ class ConfigurableCNN(nn.Module):
         return x
 
 def create_model_for_tenant(tenant_id: str, config: ModelConfig, dataset: str):
+    """Create a new model for a tenant on the current device."""
     model = ConfigurableCNN(config, dataset).to(device)
+    print(f"Created model for tenant '{tenant_id}' on {device}")
 
     # Support Adam, AdamW, and SGD optimizers
     if config.optimizer == 'sgd':
@@ -319,7 +327,8 @@ async def train(request: TrainingRequest):
     criterion = state["criterion"]
 
     model.train()
-    train_loader = get_train_loader(request.dataset, request.batch_size)
+    # Use tenant-specific DataLoader for training isolation
+    train_loader = get_train_loader(request.dataset, request.batch_size, tenant_id)
 
     total_loss = 0
     correct = 0

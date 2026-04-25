@@ -1,5 +1,14 @@
 import { create } from 'zustand'
 
+// Generate unique tenant ID for each user session
+const generateTenantId = (): string => {
+  const stored = localStorage.getItem('cnn_tenant_id')
+  if (stored) return stored
+  const newId = `user-${Date.now()}-${Math.random().toString(36).substring(2, 8)}`
+  localStorage.setItem('cnn_tenant_id', newId)
+  return newId
+}
+
 export interface CNNLayer {
   type: 'conv' | 'pool' | 'fc' | 'flatten'
   name: string
@@ -119,7 +128,7 @@ export const useCNNStore = create<CNNStore>((set) => ({
   currentEpoch: 0,
   lossHistory: [],
   modelId: null,
-  tenantId: 'default-tenant',
+  tenantId: generateTenantId(),
 
   setTrainingStatus: (status) => set({ trainingStatus: status }),
   setCurrentEpoch: (epoch) => set({ currentEpoch: epoch }),
