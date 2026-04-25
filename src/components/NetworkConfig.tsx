@@ -261,6 +261,29 @@ export function NetworkConfig() {
       }
     }
 
+    // Check out_channels validity
+    for (let i = 0; i < layers.length; i++) {
+      const layer = layers[i]
+      if (layer.type === 'conv' && (!layer.outChannels || layer.outChannels < 1)) {
+        errors.push({
+          message: `卷积层 ${layer.name} 的输出通道数必须 >= 1`,
+          affectedLayers: [i]
+        })
+      }
+    }
+
+    // Check if flatten has valid input (must have conv before it)
+    const flattenIndex = layers.findIndex(l => l.type === 'flatten')
+    if (flattenIndex > 0) {
+      const hasConvBeforeFlatten = layers.slice(0, flattenIndex).some(l => l.type === 'conv')
+      if (!hasConvBeforeFlatten) {
+        errors.push({
+          message: '扁平化层之前必须有卷积层',
+          affectedLayers: [flattenIndex]
+        })
+      }
+    }
+
     return errors
   }
 
