@@ -46,18 +46,21 @@ export function TrainingPanel() {
 
   const startTraining = async () => {
     console.log('[TrainingPanel] Starting training...')
-    setTrainingStatus('training')
-    clearTrainingHistory()
-    console.log('[TrainingPanel] Training status set to training, clearing history')
+
+    // Reset state at start
+    const currentConfig = useCNNStore.getState().cnnConfig
+    const tenantId = useCNNStore.getState().tenantId
 
     // Delete existing model and create new one with current config
     try {
-      const tenantId = useCNNStore.getState().tenantId
-      const currentConfig = useCNNStore.getState().cnnConfig
-
       // Delete old model
-      await fetch(`/api/model/${tenantId}`, { method: 'DELETE' })
+      const deleteRes = await fetch(`/api/model/${tenantId}`, { method: 'DELETE' })
+      console.log('[TrainingPanel] Delete model response:', deleteRes.status)
+    } catch (e) {
+      console.error('[TrainingPanel] Failed to delete model:', e)
+    }
 
+    try {
       // Create new model with current network config
       const layers = currentConfig.layers.map((l, i) => ({
         type: l.type,
@@ -72,7 +75,7 @@ export function TrainingPanel() {
         activation: l.activation
       }))
 
-      await fetch('/api/model/create', {
+      const createRes = await fetch('/api/model/create', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -85,10 +88,21 @@ export function TrainingPanel() {
           dataset: useCNNStore.getState().datasetInfo?.name || 'mnist'
         })
       })
+
+      if (!createRes.ok) {
+        throw new Error(`Failed to create model: ${createRes.status}`)
+      }
       console.log('[TrainingPanel] Model recreated with new config')
     } catch (e) {
       console.error('[TrainingPanel] Failed to recreate model:', e)
+      alert('创建模型失败: ' + (e instanceof Error ? e.message : String(e)))
+      setTrainingStatus('idle')
+      return
     }
+
+    // Now set training status and start training
+    setTrainingStatus('training')
+    clearTrainingHistory()
 
     for (let epoch = 1; epoch <= cnnConfig.epochs; epoch++) {
       const currentStatus = useCNNStore.getState().trainingStatus
@@ -232,7 +246,7 @@ export function TrainingPanel() {
         </div>
 
         <div className="btn-row">
-          {trainingStatus === 'idle' && (
+          {(trainingStatus === 'idle' || trainingStatus === 'error') && (
             <button className="btn btn-primary" onClick={startTraining}>
               <Play size={14} style={{ marginRight: 4 }} />
               开始训练
@@ -254,6 +268,12 @@ export function TrainingPanel() {
                 重置
               </button>
             </>
+          )}
+          {trainingStatus === 'error' && (
+            <button className="btn btn-secondary" onClick={resetTraining}>
+              <RotateCcw size={14} style={{ marginRight: 4 }} />
+              重置
+            </button>
           )}
         </div>
       </div>
