@@ -4,13 +4,11 @@ import './PoolingScene.css'
 interface PoolingSceneProps {
   inputSize?: number
   poolSize?: number
-  isAnimating?: boolean
 }
 
 export default function PoolingScene({
   inputSize = 8,
-  poolSize = 2,
-  isAnimating = false
+  poolSize = 2
 }: PoolingSceneProps) {
   const [inputData, setInputData] = useState<number[][]>([])
   const [outputData, setOutputData] = useState<number[][]>([])
@@ -20,7 +18,7 @@ export default function PoolingScene({
   const [isComplete, setIsComplete] = useState(false)
   const stepCountRef = useRef(0)
 
-  const outputSize = inputSize / poolSize
+  const outputSize = Math.floor(inputSize / poolSize)
   const totalSteps = outputSize * outputSize
 
   useEffect(() => {

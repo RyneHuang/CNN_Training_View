@@ -1,7 +1,6 @@
 .pooling-scene {
   padding: 0.75rem;
-  max-height: 100vh;
-  overflow: hidden;
+  overflow: visible;
 }
 
 .pooling-info {
@@ -23,7 +22,7 @@
   gap: 1.5rem;
   justify-content: center;
   align-items: flex-start;
-  flex-wrap: nowrap;
+  flex-wrap: wrap;
 }
 
 .grid-section {

@@ -1,5 +1,7 @@
 import { useState, useEffect, useMemo } from 'react'
-import { useCNNStore, CNNLayer } from '../store/cnnStore'
+import { useCNNStore } from '../store/cnnStore'
+import { CNNLayer } from '../types'
+import { getLayerInChannels } from '../utils/layerUtils'
 import { Plus, Trash2, ChevronDown, ChevronUp, ArrowRight, GripVertical, AlertCircle } from 'lucide-react'
 import {
   DndContext,
@@ -287,28 +289,9 @@ export function NetworkConfig() {
     return errors
   }
 
-  // Get input channels for each layer (auto-derived)
+  // Get input channels for each layer (auto-derived) - wrapper for shared utility
   const getInChannels = (index: number): number => {
-    if (index === 0) {
-      // First layer: derive from dataset
-      if (datasetInfo?.name === 'mnist') return 1
-      if (datasetInfo?.name === 'cifar10') return 3
-      return 3 // default
-    }
-    // Subsequent layers: from previous layer's output
-    const prevLayer = cnnConfig.layers[index - 1]
-    if (prevLayer.type === 'conv') {
-      return prevLayer.outChannels || 32
-    }
-    if (prevLayer.type === 'pool') {
-      // Find previous conv layer
-      for (let i = index - 2; i >= 0; i--) {
-        if (cnnConfig.layers[i].type === 'conv') {
-          return cnnConfig.layers[i].outChannels || 32
-        }
-      }
-    }
-    return 1
+    return getLayerInChannels(cnnConfig.layers, index, datasetInfo)
   }
 
   // Calculate shapes after each layer
@@ -319,9 +302,10 @@ export function NetworkConfig() {
     let height = imageSize
     let width = imageSize
 
-    if (datasetInfo?.name === 'mnist') {
+    if (['mnist', 'fashion_mnist', 'kmnist'].includes(datasetInfo?.name || '')) {
       channels = 1
-    } else if (datasetInfo?.name === 'cifar10') {
+    } else {
+      // cifar10, cifar100 and other RGB datasets
       channels = 3
     }
 
@@ -436,10 +420,10 @@ export function NetworkConfig() {
             onDragEnd={handleDragEnd}
           >
             <SortableContext
-              items={cnnConfig.layers.map((_, i) => `layer-${i}`)}
+              items={cnnConfig.layers.map((_: CNNLayer, i: number) => `layer-${i}`)}
               strategy={verticalListSortingStrategy}
             >
-              {cnnConfig.layers.map((layer, index) => (
+              {cnnConfig.layers.map((layer: CNNLayer, index: number) => (
                 <SortableLayerItem
                   key={`layer-${index}`}
                   layer={layer}

@@ -1,28 +1,11 @@
-import { useCNNStore } from '../store/cnnStore'
+import { useRef } from 'react'
+import { useCNNStore, CNNLayer } from '../store/cnnStore'
+import { getLayerInChannels } from '../utils/layerUtils'
 import { Play, Square, RotateCcw, Loader2 } from 'lucide-react'
 
-// Auto-derive input channels for each layer
-function getLayerInChannels(layers: any[], index: number, datasetInfo: any): number {
-  if (index === 0) {
-    // First layer: derive from dataset
-    if (datasetInfo?.name === 'mnist') return 1
-    if (datasetInfo?.name === 'cifar10') return 3
-    return 3
-  }
-  // Subsequent layers: from previous layer's output
-  const prevLayer = layers[index - 1]
-  if (prevLayer.type === 'conv') {
-    return prevLayer.outChannels || 32
-  }
-  if (prevLayer.type === 'pool') {
-    // Find previous conv layer
-    for (let i = index - 2; i >= 0; i--) {
-      if (layers[i].type === 'conv') {
-        return layers[i].outChannels || 32
-      }
-    }
-  }
-  return 1
+function safeNumber(value: string, fallback: number): number {
+  const n = Number(value)
+  return isNaN(n) || n <= 0 ? fallback : n
 }
 
 export function TrainingPanel() {
@@ -36,24 +19,25 @@ export function TrainingPanel() {
     setCurrentEpoch,
     addTrainingHistory,
     clearTrainingHistory,
+    setHasTrainedModel,
     setEpochs,
     setBatchSize,
     setLearningRate,
     setOptimizer
   } = useCNNStore()
 
+  const abortRef = useRef<AbortController | null>(null)
+
   const latestEntry = lossHistory[lossHistory.length - 1]
 
   const startTraining = async () => {
     console.log('[TrainingPanel] Starting training...')
 
-    // Reset state at start
     const currentConfig = useCNNStore.getState().cnnConfig
     const tenantId = useCNNStore.getState().tenantId
 
     // Delete existing model and create new one with current config
     try {
-      // Delete old model
       const deleteRes = await fetch(`/api/model/${tenantId}`, { method: 'DELETE' })
       console.log('[TrainingPanel] Delete model response:', deleteRes.status)
     } catch (e) {
@@ -61,8 +45,7 @@ export function TrainingPanel() {
     }
 
     try {
-      // Create new model with current network config
-      const layers = currentConfig.layers.map((l, i) => ({
+      const layers = currentConfig.layers.map((l: CNNLayer, i: number) => ({
         type: l.type,
         name: l.name,
         in_channels: l.type === 'conv' ? getLayerInChannels(currentConfig.layers, i, datasetInfo) : undefined,
@@ -100,56 +83,77 @@ export function TrainingPanel() {
       return
     }
 
-    // Now set training status and start training
+    // Create AbortController for this training session
+    const controller = new AbortController()
+    abortRef.current = controller
+
     setTrainingStatus('training')
     clearTrainingHistory()
 
-    for (let epoch = 1; epoch <= cnnConfig.epochs; epoch++) {
-      const currentStatus = useCNNStore.getState().trainingStatus
-      if (currentStatus !== 'training') break
+    try {
+      // Train epoch by epoch for real-time UI updates
+      for (let epoch = 1; epoch <= cnnConfig.epochs; epoch++) {
+        // Check if user stopped training
+        if (useCNNStore.getState().trainingStatus !== 'training') break
 
-      setCurrentEpoch(epoch)
+        setCurrentEpoch(epoch)
 
-      try {
-        console.log('[TrainingPanel] Fetching /api/train for epoch', epoch)
         const response = await fetch('/api/train', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            tenant_id: useCNNStore.getState().tenantId,
+            tenant_id: tenantId,
             batch_size: cnnConfig.batchSize,
             learning_rate: cnnConfig.learningRate,
             dataset: useCNNStore.getState().datasetInfo?.name || 'mnist',
             epochs: 1
-          })
+          }),
+          signal: controller.signal
         })
-        console.log('[TrainingPanel] Response status:', response.status)
+
+        if (response.status === 409) {
+          console.log('[TrainingPanel] Training already in progress')
+          return
+        }
 
         if (!response.ok) {
-          throw new Error('Training failed')
+          throw new Error(`Training failed (${response.status})`)
         }
 
         const result = await response.json()
-        console.log('[TrainingPanel] Result:', result)
 
         addTrainingHistory({
           epoch: result.epoch,
           loss: result.loss,
           accuracy: result.accuracy
         })
-      } catch (error) {
-        console.error('[TrainingPanel] Training error:', error)
-        alert('训练失败: ' + (error instanceof Error ? error.message : String(error)))
-        setTrainingStatus('error')
+        setHasTrainedModel(true)
+      }
+
+      // Only set completed if still in training state (user may have stopped)
+      if (useCNNStore.getState().trainingStatus === 'training') {
+        setTrainingStatus('completed')
+      }
+    } catch (error) {
+      if ((error as Error).name === 'AbortError') {
+        console.log('[TrainingPanel] Training aborted by user')
         return
       }
+      console.error('[TrainingPanel] Training error:', error)
+      if (useCNNStore.getState().trainingStatus === 'training') {
+        alert('训练失败: ' + (error instanceof Error ? error.message : String(error)))
+        setTrainingStatus('error')
+      }
+    } finally {
+      abortRef.current = null
     }
-
-    console.log('[TrainingPanel] Training loop completed, setting status to completed')
-    setTrainingStatus('completed')
   }
 
   const stopTraining = () => {
+    if (abortRef.current) {
+      abortRef.current.abort()
+      abortRef.current = null
+    }
     setTrainingStatus('idle')
   }
 
@@ -193,6 +197,15 @@ export function TrainingPanel() {
           {trainingStatus === 'completed' && <span className="status-completed">已完成</span>}
         </div>
 
+        <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '0.5rem', lineHeight: 1.4 }}>
+          当前网络: {cnnConfig.layers.map(l => {
+            if (l.type === 'conv') return `${l.name}(${l.outChannels}ch)`
+            if (l.type === 'pool') return `${l.name}(${l.poolSize}x${l.poolSize})`
+            if (l.type === 'fc') return `${l.name}(${l.units})`
+            return l.name
+          }).join(' → ')}
+        </div>
+
         {trainingStatus === 'training' && (
           <div className="progress-bar">
             <div className="progress-fill" style={{ width: `${progress}%` }} />
@@ -219,7 +232,7 @@ export function TrainingPanel() {
             type="number"
             className="config-input"
             value={cnnConfig.epochs}
-            onChange={(e) => setEpochs(Number(e.target.value))}
+            onChange={(e) => setEpochs(safeNumber(e.target.value, cnnConfig.epochs))}
             disabled={trainingStatus === 'training'}
           />
         </div>
@@ -229,7 +242,7 @@ export function TrainingPanel() {
             type="number"
             className="config-input"
             value={cnnConfig.batchSize}
-            onChange={(e) => setBatchSize(Number(e.target.value))}
+            onChange={(e) => setBatchSize(safeNumber(e.target.value, cnnConfig.batchSize))}
             disabled={trainingStatus === 'training'}
           />
         </div>
@@ -240,7 +253,7 @@ export function TrainingPanel() {
             step="0.0001"
             className="config-input"
             value={cnnConfig.learningRate}
-            onChange={(e) => setLearningRate(Number(e.target.value))}
+            onChange={(e) => setLearningRate(safeNumber(e.target.value, cnnConfig.learningRate))}
             disabled={trainingStatus === 'training'}
           />
         </div>

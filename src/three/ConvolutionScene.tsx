@@ -12,7 +12,7 @@ export default function ConvolutionScene({
   inputSize = 5,
   kernelSize = 3,
   stride = 1,
-  isAnimating = false
+  isAnimating = true
 }: ConvolutionSceneProps) {
   const [inputData, setInputData] = useState<number[][]>([])
   const [kernel, setKernel] = useState<number[][]>([])
@@ -54,7 +54,7 @@ export default function ConvolutionScene({
     setCurrentSum(null)
     setIsComplete(false)
     stepCountRef.current = 0
-  }, [inputSize, kernelSize])
+  }, [inputSize, kernelSize, stride])
 
   const computeNextStep = useCallback(() => {
     if (inputData.length === 0 || outputData.length === totalSteps) return
@@ -105,6 +105,15 @@ export default function ConvolutionScene({
     stepCountRef.current = 0
   }
 
+  // Auto-play animation
+  useEffect(() => {
+    if (!isAnimating || isComplete || inputData.length === 0) return
+    const timer = setInterval(() => {
+      computeNextStep()
+    }, 600)
+    return () => clearInterval(timer)
+  }, [isAnimating, isComplete, inputData.length, computeNextStep])
+
   const isInWindow = (r: number, c: number) => {
     if (!currentPos) return false
     return (
@@ -143,7 +152,7 @@ export default function ConvolutionScene({
       <div className="grids-container">
         <div className="grid-section">
           <h4>输入特征图 ({inputSize}×{inputSize})</h4>
-          <div className="grid input-grid" style={{ gridTemplateColumns: `repeat(${inputSize}, 36px)` }}>
+          <div className="grid input-grid" style={{ gridTemplateColumns: `repeat(${inputSize}, 30px)` }}>
             {inputData.map((row, i) =>
               row.map((val, j) => (
                 <div
@@ -160,7 +169,7 @@ export default function ConvolutionScene({
 
         <div className="kernel-section">
           <h4>卷积核 ({kernelSize}×{kernelSize})</h4>
-          <div className="grid kernel-grid" style={{ gridTemplateColumns: `repeat(${kernelSize}, 36px)` }}>
+          <div className="grid kernel-grid" style={{ gridTemplateColumns: `repeat(${kernelSize}, 30px)` }}>
             {kernel.map((row, i) =>
               row.map((val, j) => (
                 <div key={`${i}-${j}`} className={`cell kernel-cell ${val > 0 ? 'positive' : 'negative'}`}>
@@ -171,44 +180,9 @@ export default function ConvolutionScene({
           </div>
         </div>
 
-        <div className="calculation-section">
-          <h4>当前计算</h4>
-          {currentWindow.length > 0 ? (
-            <div className="calculation-box">
-              <div className="window-display">
-                <div className="window-grid">
-                  {currentWindow.map((row, i) =>
-                    <div key={i} className="window-row">
-                      {row.map((val, j) => (
-                        <span key={j} className="window-val">{val}</span>
-                      ))}
-                    </div>
-                  )}
-                </div>
-                <span className="multiply">×</span>
-                <div className="window-grid kernel-display">
-                  {kernel.map((row, i) =>
-                    <div key={i} className="window-row">
-                      {row.map((val, j) => (
-                        <span key={j} className={`window-val ${val > 0 ? 'positive' : 'negative'}`}>{val}</span>
-                      ))}
-                    </div>
-                  )}
-                </div>
-                <span className="equals">=</span>
-                <span className="result">{currentSum}</span>
-              </div>
-            </div>
-          ) : (
-            <div className="calculation-placeholder">
-              {isComplete ? '计算完成！' : '点击"下一步"开始'}
-            </div>
-          )}
-        </div>
-
         <div className="grid-section">
           <h4>输出特征图 ({outputSize}×{outputSize})</h4>
-          <div className="grid output-grid" style={{ gridTemplateColumns: `repeat(${outputSize}, 36px)` }}>
+          <div className="grid output-grid" style={{ gridTemplateColumns: `repeat(${outputSize}, 30px)` }}>
             {Array(outputSize).fill(null).map((_, i) =>
               Array(outputSize).fill(null).map((_, j) => (
                 <div
@@ -221,6 +195,60 @@ export default function ConvolutionScene({
             )}
           </div>
         </div>
+      </div>
+
+      <div className="calculation-area">
+        <h4>当前计算</h4>
+        {currentWindow.length > 0 ? (
+          <div className="calculation-box">
+            <div className="window-display">
+              <div className="window-grid">
+                {currentWindow.map((row, i) =>
+                  <div key={i} className="window-row">
+                    {row.map((val, j) => (
+                      <span key={j} className="window-val">{val}</span>
+                    ))}
+                  </div>
+                )}
+              </div>
+              <span className="multiply">×</span>
+              <div className="window-grid kernel-display">
+                {kernel.map((row, i) =>
+                  <div key={i} className="window-row">
+                    {row.map((val, j) => (
+                      <span key={j} className={`window-val ${val > 0 ? 'positive' : 'negative'}`}>{val}</span>
+                    ))}
+                  </div>
+                )}
+              </div>
+              <span className="equals">=</span>
+              <div className="calculation-process">
+                {currentWindow.map((row, i) =>
+                  row.map((val, j) => {
+                    const k = kernel[i][j]
+                    const valStr = val < 0 ? `(${val})` : `${val}`
+                    const kStr = k < 0 ? `(${k})` : `${k}`
+                    const product = val * k
+                    const termStr = `(${valStr}×${kStr})`
+                    const displayStr = product < 0 ? `(${termStr})` : termStr
+                    return (
+                      <span key={`${i}-${j}`} className="calc-term">
+                        {displayStr}
+                        {j < row.length - 1 || i < currentWindow.length - 1 ? '+' : ''}
+                      </span>
+                    )
+                  })
+                )}
+              </div>
+              <span className="equals">=</span>
+              <span className="result">{currentSum}</span>
+            </div>
+          </div>
+        ) : (
+          <div className="calculation-placeholder">
+            {isComplete ? '计算完成！' : '点击"下一步"开始'}
+          </div>
+        )}
       </div>
 
       <div className="controls">

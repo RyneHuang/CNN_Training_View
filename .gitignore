@@ -28,5 +28,12 @@ Thumbs.db
 # Uploads
 uploads/
 data/raw/
+backend/data/
 models/*.pth
 models/*.pt
+
+# Claude Code
+.claude/
+
+# TypeScript build info
+tsconfig.tsbuildinfo

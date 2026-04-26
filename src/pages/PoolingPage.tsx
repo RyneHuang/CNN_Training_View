@@ -21,7 +21,6 @@ export default function PoolingPage() {
           <PoolingScene
             inputSize={inputSize}
             poolSize={poolSize}
-            isAnimating={isAnimating}
           />
         </div>
 

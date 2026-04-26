@@ -1,4 +1,6 @@
-import { useCNNStore, CNNLayer } from '../store/cnnStore'
+import { useCNNStore } from '../store/cnnStore'
+import { CNNLayer } from '../types'
+import { getLayerInChannels } from '../utils/layerUtils'
 import { ChevronRight } from 'lucide-react'
 
 const layerIcons: Record<string, string> = {
@@ -8,34 +10,13 @@ const layerIcons: Record<string, string> = {
   flatten: '⬜'
 }
 
-// Auto-derive input channels for each layer
-function getLayerInChannels(layers: CNNLayer[], index: number, datasetName?: string): number {
-  if (index === 0) {
-    if (datasetName === 'mnist') return 1
-    if (datasetName === 'cifar10') return 3
-    return 3
-  }
-  const prevLayer = layers[index - 1]
-  if (prevLayer.type === 'conv') {
-    return prevLayer.outChannels || 32
-  }
-  if (prevLayer.type === 'pool') {
-    for (let i = index - 2; i >= 0; i--) {
-      if (layers[i].type === 'conv') {
-        return layers[i].outChannels || 32
-      }
-    }
-  }
-  return 1
-}
-
 export function NetworkGraph() {
   const { cnnConfig, datasetInfo } = useCNNStore()
 
   const getLayerParams = (layer: CNNLayer, index: number): string => {
     switch (layer.type) {
       case 'conv':
-        const inCh = getLayerInChannels(cnnConfig.layers, index, datasetInfo?.name)
+        const inCh = getLayerInChannels(cnnConfig.layers, index, datasetInfo?.name ?? null)
         return `${inCh}→${layer.outChannels}ch, ${layer.kernelSize}×${layer.kernelSize}`
       case 'pool':
         return `${layer.poolSize}×${layer.poolSize}, stride ${layer.stride}`
@@ -56,7 +37,7 @@ export function NetworkGraph() {
       </div>
       <div className="panel-content">
         <div className="network-layers">
-          {cnnConfig.layers.map((layer, index) => (
+          {cnnConfig.layers.map((layer: CNNLayer, index: number) => (
             <div key={index} className="layer-card">
               <div className="layer-icon">{layerIcons[layer.type] || '?'}</div>
               <div className="layer-info">

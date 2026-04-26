@@ -4,16 +4,10 @@ import * as THREE from 'three'
 import { Line } from '@react-three/drei'
 
 interface TrainingSceneProps {
-  epoch?: number
-  loss?: number
-  accuracy?: number
   layerActivations?: number[]
 }
 
 export default function TrainingScene({
-  epoch = 0,
-  loss = 0,
-  accuracy = 0,
   layerActivations = [1, 0.8, 0.6, 0.4, 0.2]
 }: TrainingSceneProps) {
   const groupRef = useRef<THREE.Group>(null)

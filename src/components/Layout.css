@@ -79,5 +79,5 @@
 
 .main-content {
   flex: 1;
-  overflow: auto;
+  overflow: visible;
 }

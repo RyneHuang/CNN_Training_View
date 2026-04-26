@@ -19,3 +19,48 @@
 @keyframes spin {
   to { transform: rotate(360deg); }
 }
+
+/* Modal styles */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  backdrop-filter: blur(4px);
+}
+
+.modal-content {
+  background: var(--surface);
+  border: 1px solid var(--surface-light);
+  border-radius: 12px;
+  max-width: 520px;
+  width: 90%;
+  max-height: 80vh;
+  overflow-y: auto;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+}
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem 1.25rem;
+  border-bottom: 1px solid var(--surface-light);
+}
+
+.modal-header h3 {
+  font-size: 1rem;
+  color: var(--text);
+  margin: 0;
+}
+
+.modal-close:hover {
+  color: var(--text) !important;
+}
+
+.modal-body {
+  padding: 1.25rem;
+}

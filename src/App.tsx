@@ -1,7 +1,7 @@
-import { Canvas } from '@react-three/fiber'
 import { Suspense } from 'react'
 import { BrowserRouter, Routes, Route } from 'react-router-dom'
 import Layout from './components/Layout'
+import { ErrorBoundary } from './components/ErrorBoundary'
 import HomePage from './pages/HomePage'
 import ConvolutionPage from './pages/ConvolutionPage'
 import PoolingPage from './pages/PoolingPage'
@@ -10,18 +10,20 @@ import './App.css'
 
 function App() {
   return (
-    <BrowserRouter>
-      <Layout>
-        <Suspense fallback={<Loading />}>
-          <Routes>
-            <Route path="/" element={<HomePage />} />
-            <Route path="/convolution" element={<ConvolutionPage />} />
-            <Route path="/pooling" element={<PoolingPage />} />
-            <Route path="/training" element={<TrainingPage />} />
-          </Routes>
-        </Suspense>
-      </Layout>
-    </BrowserRouter>
+    <ErrorBoundary>
+      <BrowserRouter>
+        <Layout>
+          <Suspense fallback={<Loading />}>
+            <Routes>
+              <Route path="/" element={<HomePage />} />
+              <Route path="/convolution" element={<ConvolutionPage />} />
+              <Route path="/pooling" element={<PoolingPage />} />
+              <Route path="/training" element={<TrainingPage />} />
+            </Routes>
+          </Suspense>
+        </Layout>
+      </BrowserRouter>
+    </ErrorBoundary>
   )
 }
 

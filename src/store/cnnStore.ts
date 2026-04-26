@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import { CNNLayer, CNNConfig, TrainingHistoryEntry, DatasetInfo } from '../types'
 
 // Generate unique tenant ID for each user session
 const generateTenantId = (): string => {
@@ -9,43 +10,7 @@ const generateTenantId = (): string => {
   return newId
 }
 
-export interface CNNLayer {
-  type: 'conv' | 'pool' | 'fc' | 'flatten'
-  name: string
-  inChannels?: number
-  outChannels?: number
-  kernelSize?: number
-  padding?: number
-  poolSize?: number
-  stride?: number
-  units?: number
-  activation?: 'relu' | 'softmax' | 'sigmoid'
-}
-
-export interface CNNConfig {
-  layers: CNNLayer[]
-  optimizer: 'adam' | 'adamw' | 'sgd'
-  learningRate: number
-  batchSize: number
-  epochs: number
-}
-
-export interface TrainingHistoryEntry {
-  epoch: number
-  loss: number
-  accuracy: number
-  valLoss?: number
-  valAccuracy?: number
-}
-
-export interface DatasetInfo {
-  name: string
-  description: string
-  type: 'classification'
-  samples: number
-  imageSize?: number
-  classes?: number
-}
+export type { CNNLayer, CNNConfig, TrainingHistoryEntry, DatasetInfo }
 
 interface CNNStore {
   // Network config
@@ -61,6 +26,7 @@ interface CNNStore {
 
   // Training state
   trainingStatus: 'idle' | 'training' | 'completed' | 'error'
+  hasTrainedModel: boolean
   currentEpoch: number
   lossHistory: TrainingHistoryEntry[]
   modelId: string | null
@@ -71,6 +37,7 @@ interface CNNStore {
   setCurrentEpoch: (epoch: number) => void
   addTrainingHistory: (entry: TrainingHistoryEntry) => void
   clearTrainingHistory: () => void
+  setHasTrainedModel: (value: boolean) => void
   setModelId: (id: string | null) => void
   setTenantId: (id: string) => void
   setEpochs: (epochs: number) => void
@@ -84,22 +51,21 @@ interface CNNStore {
 
 const defaultConfig: CNNConfig = {
   layers: [
-    // 更深的网络结构，适合 MNIST
     { type: 'conv', name: 'Conv1', outChannels: 64, kernelSize: 3, padding: 1, activation: 'relu' },
     { type: 'pool', name: 'Pool1', poolSize: 2, stride: 2 },
     { type: 'conv', name: 'Conv2', outChannels: 128, kernelSize: 3, padding: 1, activation: 'relu' },
     { type: 'pool', name: 'Pool2', poolSize: 2, stride: 2 },
     { type: 'flatten', name: 'Flat' },
     { type: 'fc', name: 'FC1', units: 512, activation: 'relu' },
-    { type: 'fc', name: 'FC2', units: 10 },  // 输出层不需要 softmax, CrossEntropyLoss 会处理
+    { type: 'fc', name: 'FC2', units: 10 },
   ],
   optimizer: 'adam',
-  learningRate: 0.003,  // 配合 CosineAnnealing 学习率调度器
-  batchSize: 256,  // 更大的 batch size 加快训练
+  learningRate: 0.003,
+  batchSize: 256,
   epochs: 50
 }
 
-export const useCNNStore = create<CNNStore>((set) => ({
+export const useCNNStore = create<CNNStore>((set, get) => ({
   // Network config
   cnnConfig: defaultConfig,
   setCNNConfig: (config) => set({ cnnConfig: config }),
@@ -109,13 +75,13 @@ export const useCNNStore = create<CNNStore>((set) => ({
   removeLayer: (index) => set((state) => ({
     cnnConfig: {
       ...state.cnnConfig,
-      layers: state.cnnConfig.layers.filter((_, i) => i !== index)
+      layers: state.cnnConfig.layers.filter((_: CNNLayer, i: number) => i !== index)
     }
   })),
   updateLayer: (index, layer) => set((state) => ({
     cnnConfig: {
       ...state.cnnConfig,
-      layers: state.cnnConfig.layers.map((l, i) => i === index ? layer : l)
+      layers: state.cnnConfig.layers.map((l: CNNLayer, i: number) => i === index ? layer : l)
     }
   })),
 
@@ -125,6 +91,7 @@ export const useCNNStore = create<CNNStore>((set) => ({
 
   // Training state
   trainingStatus: 'idle',
+  hasTrainedModel: false,
   currentEpoch: 0,
   lossHistory: [],
   modelId: null,
@@ -135,7 +102,8 @@ export const useCNNStore = create<CNNStore>((set) => ({
   addTrainingHistory: (entry) => set((state) => ({
     lossHistory: [...state.lossHistory, entry]
   })),
-  clearTrainingHistory: () => set({ lossHistory: [], currentEpoch: 0 }),
+  clearTrainingHistory: () => set({ lossHistory: [], currentEpoch: 0, hasTrainedModel: false }),
+  setHasTrainedModel: (value) => set({ hasTrainedModel: value }),
   setModelId: (id) => set({ modelId: id }),
   setTenantId: (id) => set({ tenantId: id }),
   setEpochs: (epochs) => set((state) => ({ cnnConfig: { ...state.cnnConfig, epochs } })),
@@ -144,16 +112,29 @@ export const useCNNStore = create<CNNStore>((set) => ({
   setOptimizer: (optimizer) => set((state) => ({ cnnConfig: { ...state.cnnConfig, optimizer } })),
 
   // Inference
-  predict: async (_imageData) => {
-    // TODO: Call backend API
-    // For now, return mock prediction
-    const mockPrediction = new Array(10).fill(0).map(() => Math.random())
-    const maxIdx = mockPrediction.indexOf(Math.max(...mockPrediction))
-    mockPrediction[maxIdx] = 1
+  predict: async (imageData: number[]) => {
+    const { tenantId } = get()
+
+    const response = await fetch('/api/inference', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        tenant_id: tenantId,
+        image_data: imageData
+      })
+    })
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => null)
+      const message = errorData?.detail || `推理失败 (${response.status})`
+      throw new Error(message)
+    }
+
+    const result = await response.json()
     return {
-      prediction: mockPrediction,
-      predictedClass: maxIdx,
-      confidence: 0.95
+      prediction: result.probabilities as number[],
+      predictedClass: result.predicted_class as number,
+      confidence: result.confidence as number
     }
   }
 }))

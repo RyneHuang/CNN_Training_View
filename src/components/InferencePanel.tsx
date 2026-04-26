@@ -8,7 +8,7 @@ interface SampleImage {
 }
 
 export function InferencePanel() {
-  const { trainingStatus, datasetInfo, tenantId } = useCNNStore()
+  const { hasTrainedModel, datasetInfo, tenantId } = useCNNStore()
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
   const [prediction, setPrediction] = useState<{ class: number, confidence: number, probs: number[] } | null>(null)
   const [loading, setLoading] = useState(false)
@@ -19,7 +19,7 @@ export function InferencePanel() {
 
   // Fetch validation samples
   useEffect(() => {
-    if (trainingStatus === 'completed' && datasetInfo) {
+    if (hasTrainedModel && datasetInfo) {
       fetch(`/api/datasets/${datasetInfo.name}/samples?count=20`)
         .then(res => res.json())
         .then(data => {
@@ -32,9 +32,9 @@ export function InferencePanel() {
         })
         .catch(err => console.error('Failed to load samples:', err))
     }
-  }, [trainingStatus, datasetInfo])
+  }, [hasTrainedModel, datasetInfo])
 
-  const renderSampleToCanvas = (sampleData: number[], size: number = 28) => {
+  const renderSampleToCanvas = (sampleData: number[], size: number = 28, channels: number = 1) => {
     const canvas = document.createElement('canvas')
     canvas.width = size
     canvas.height = size
@@ -42,21 +42,39 @@ export function InferencePanel() {
     if (!ctx) return ''
 
     const imageData = ctx.createImageData(size, size)
-    for (let i = 0; i < sampleData.length; i++) {
-      const val = Math.max(0, Math.min(255, sampleData[i]))
-      imageData.data[i * 4] = val
-      imageData.data[i * 4 + 1] = val
-      imageData.data[i * 4 + 2] = val
-      imageData.data[i * 4 + 3] = 255
+    if (channels === 1) {
+      // Grayscale: data is [1, H, W] flattened
+      for (let i = 0; i < size * size; i++) {
+        const val = Math.max(0, Math.min(255, sampleData[i]))
+        imageData.data[i * 4] = val
+        imageData.data[i * 4 + 1] = val
+        imageData.data[i * 4 + 2] = val
+        imageData.data[i * 4 + 3] = 255
+      }
+    } else {
+      // RGB: data is [C, H, W] flattened (CHW format)
+      const pixelCount = size * size
+      for (let i = 0; i < pixelCount; i++) {
+        imageData.data[i * 4] = Math.max(0, Math.min(255, sampleData[i]))                    // R
+        imageData.data[i * 4 + 1] = Math.max(0, Math.min(255, sampleData[i + pixelCount]))   // G
+        imageData.data[i * 4 + 2] = Math.max(0, Math.min(255, sampleData[i + pixelCount * 2])) // B
+        imageData.data[i * 4 + 3] = 255
+      }
     }
     ctx.putImageData(imageData, 0, 0)
     return canvas.toDataURL()
   }
 
+  const getDatasetChannels = () => {
+    const name = datasetInfo?.name || 'mnist'
+    return ['cifar10', 'cifar100'].includes(name) ? 3 : 1
+  }
+
   const handleSampleClick = (sample: SampleImage, index: number) => {
     setSelectedSample(index)
     const imageSize = datasetInfo?.imageSize || 28
-    const imageUrl = renderSampleToCanvas(sample.data, imageSize)
+    const channels = getDatasetChannels()
+    const imageUrl = renderSampleToCanvas(sample.data, imageSize, channels)
     setPreviewUrl(imageUrl)
     setPrediction(null)
   }
@@ -163,7 +181,7 @@ export function InferencePanel() {
     }
   }
 
-  if (trainingStatus !== 'completed') {
+  if (!hasTrainedModel) {
     return (
       <div className="panel-card">
         <div className="panel-header">
@@ -225,7 +243,7 @@ export function InferencePanel() {
                   title={`Label: ${sample.label}`}
                 >
                   <img
-                    src={renderSampleToCanvas(sample.data, datasetInfo?.imageSize || 28)}
+                    src={renderSampleToCanvas(sample.data, datasetInfo?.imageSize || 28, getDatasetChannels())}
                     alt={`Sample ${index}`}
                   />
                   {selectedSample === index && (
@@ -236,24 +254,6 @@ export function InferencePanel() {
             </div>
           </div>
         )}
-
-        <div className="divider-text">或上传图片</div>
-
-        <div
-          className="upload-zone"
-          onClick={() => fileInputRef.current?.click()}
-          onDrop={handleDrop}
-          onDragOver={(e) => e.preventDefault()}
-        >
-          {previewUrl ? (
-            <img src={previewUrl} alt="Preview" style={{ maxWidth: '100%', maxHeight: '120px', borderRadius: '8px' }} />
-          ) : (
-            <>
-              <div className="upload-icon">📷</div>
-              <div className="upload-text">点击或拖拽上传图片</div>
-            </>
-          )}
-        </div>
 
         <button
           className="btn btn-primary"
@@ -290,7 +290,7 @@ export function InferencePanel() {
             </div>
             <div className="info-item">
               <span className="info-label">类别</span>
-              <span className="info-value">0-9 数字</span>
+              <span className="info-value">{datasetInfo.classes} 类</span>
             </div>
           </div>
         )}

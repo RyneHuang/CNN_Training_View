@@ -28,7 +28,6 @@ export default function HomePage() {
             inputSize={5}
             kernelSize={3}
             stride={1}
-            isAnimating={true}
           />
         </div>
       </div>
