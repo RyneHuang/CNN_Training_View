@@ -5,7 +5,7 @@ import './PoolingPage.css'
 export default function PoolingPage() {
   const [inputSize, setInputSize] = useState(8)
   const [poolSize, setPoolSize] = useState(2)
-  const [isAnimating, setIsAnimating] = useState(true)
+  const [isAnimating, setIsAnimating] = useState(false)
 
   const outputSize = inputSize / poolSize
 
@@ -21,6 +21,7 @@ export default function PoolingPage() {
           <PoolingScene
             inputSize={inputSize}
             poolSize={poolSize}
+            isAnimating={isAnimating}
           />
         </div>
 

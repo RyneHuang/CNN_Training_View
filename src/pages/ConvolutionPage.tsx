@@ -6,7 +6,7 @@ export default function ConvolutionPage() {
   const [inputSize, setInputSize] = useState(5)
   const [kernelSize, setKernelSize] = useState(3)
   const [stride, setStride] = useState(1)
-  const [isAnimating, setIsAnimating] = useState(true)
+  const [isAnimating, setIsAnimating] = useState(false)
 
   const outputSize = Math.floor((inputSize - kernelSize) / stride) + 1
 

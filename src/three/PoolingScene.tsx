@@ -4,11 +4,13 @@ import './PoolingScene.css'
 interface PoolingSceneProps {
   inputSize?: number
   poolSize?: number
+  isAnimating?: boolean
 }
 
 export default function PoolingScene({
   inputSize = 8,
-  poolSize = 2
+  poolSize = 2,
+  isAnimating = true
 }: PoolingSceneProps) {
   const [inputData, setInputData] = useState<number[][]>([])
   const [outputData, setOutputData] = useState<number[][]>([])
@@ -90,6 +92,15 @@ export default function PoolingScene({
     setIsComplete(false)
     stepCountRef.current = 0
   }
+
+  // Auto-play animation
+  useEffect(() => {
+    if (!isAnimating || isComplete || inputData.length === 0) return
+    const timer = setInterval(() => {
+      computeNextStep()
+    }, 600)
+    return () => clearInterval(timer)
+  }, [isAnimating, isComplete, inputData.length, computeNextStep])
 
   const isInWindow = (r: number, c: number) => {
     if (!currentPos) return false

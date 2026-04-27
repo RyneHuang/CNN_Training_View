@@ -153,14 +153,14 @@
 
 .window-grid {
   display: inline-flex;
-  flex-direction: row;
+  flex-direction: column;
   align-items: center;
   gap: 2px;
 }
 
 .window-row {
   display: inline-flex;
-  flex-direction: column;
+  flex-direction: row;
   gap: 2px;
 }
 
