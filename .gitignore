@@ -28,7 +28,7 @@ Thumbs.db
 # Uploads
 uploads/
 data/raw/
-backend/data/
+# backend/data/  # 已包含数据集，需要提交
 models/*.pth
 models/*.pt
 
