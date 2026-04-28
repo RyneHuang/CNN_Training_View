@@ -86,15 +86,7 @@ DATASET_CONFIGS = {
             transforms.Normalize((0.5071, 0.4867, 0.4408), (0.2675, 0.2565, 0.2761))
         ])
     },
-    "kmnist": {
-        "input_channels": 1,
-        "image_size": 28,
-        "num_classes": 10,
-        "transform": transforms.Compose([
-            transforms.ToTensor(),
-            transforms.Normalize((0.1918,), (0.3483,))
-        ])
-    }
+
 }
 
 DATASET_DESCRIPTIONS = {
@@ -137,16 +129,6 @@ DATASET_DESCRIPTIONS = {
         "classes": ["100 个细分类别（如各种动物、植物、交通工具等）"],
         "channels": "RGB (3通道)",
         "recommended_model": "深度网络 (4-6 层卷积) + 数据增强 + 正则化，准确率可达 60-70%"
-    },
-    "kmnist": {
-        "name": "KMNIST",
-        "full_name": "Kuzushiji-MNIST",
-        "description": "KMNIST 是以日本古代草书（变体假名）字符为内容的数据集，包含 70,000 张 28×28 灰度图像。10 个类别对应不同的假名字符。由于草书风格差异大，笔画复杂，比 MNIST 更有挑战性，适合测试模型对不同书写风格的泛化能力。",
-        "difficulty": "初级-中级",
-        "paper": "Clanuwat et al., 2018 (arXiv:1812.01718)",
-        "classes": ["お", "き", "す", "つ", "な", "は", "ま", "や", "れ", "を"],
-        "channels": "灰度 (1通道)",
-        "recommended_model": "2-3 个卷积层，准确率可达 95%+"
     }
 }
 
@@ -218,20 +200,6 @@ DEFAULT_NETWORKS = {
         "learning_rate": 0.001,
         "batch_size": 64,
         "epochs": 50
-    },
-    "kmnist": {
-        "layers": [
-            {"type": "conv", "name": "Conv1", "out_channels": 32, "kernel_size": 3, "padding": 1, "activation": "relu"},
-            {"type": "conv", "name": "Conv2", "out_channels": 64, "kernel_size": 3, "padding": 1, "activation": "relu"},
-            {"type": "pool", "name": "Pool1", "pool_size": 2, "stride": 2},
-            {"type": "flatten", "name": "Flatten"},
-            {"type": "fc", "name": "FC1", "units": 128, "activation": "relu"},
-            {"type": "fc", "name": "FC2", "units": 10},
-        ],
-        "optimizer": "adam",
-        "learning_rate": 0.001,
-        "batch_size": 128,
-        "epochs": 15
     }
 }
 
@@ -252,7 +220,7 @@ class ModelConfig(BaseModel):
     optimizer: Literal["adam", "adamw", "sgd"] = "adam"
     learning_rate: float = Field(0.001, gt=0, le=1.0)
 
-DatasetName = Literal["mnist", "fashion_mnist", "cifar10", "cifar100", "kmnist"]
+DatasetName = Literal["mnist", "fashion_mnist", "cifar10", "cifar100"]
 
 class BatchTrainingRequest(BaseModel):
     tenant_id: str
@@ -287,7 +255,6 @@ DATASET_CLASSES = {
     "fashion_mnist": datasets.FashionMNIST,
     "cifar10": datasets.CIFAR10,
     "cifar100": datasets.CIFAR100,
-    "kmnist": datasets.KMNIST,
 }
 
 def _load_torchvision_dataset(dataset_name: str, train: bool, transform):
@@ -488,7 +455,7 @@ async def lifespan(app: FastAPI):
     )
     # Preload small datasets only (MNIST ~10MB, Fashion-MNIST ~30MB, KMNIST ~10MB)
     # Large datasets (CIFAR-10 ~170MB, CIFAR-100 ~170MB) will be downloaded on first use
-    SMALL_DATASETS = ["mnist", "fashion_mnist", "kmnist"]
+    SMALL_DATASETS = ["mnist", "fashion_mnist"]
     for ds_name in SMALL_DATASETS:
         try:
             get_train_loader(ds_name, 32)
@@ -797,7 +764,7 @@ async def get_dataset_info(dataset_name: str):
         "image_size": config["image_size"],
         "input_channels": config["input_channels"],
         "num_classes": config["num_classes"],
-        "train_samples": 60000 if dataset_name in ("mnist", "fashion_mnist", "kmnist") else 50000,
+        "train_samples": 60000 if dataset_name in ("mnist", "fashion_mnist") else 50000,
         "test_samples": 10000
     }
 
@@ -821,7 +788,7 @@ async def get_dataset_samples(dataset_name: str, count: int = 10):
         if i >= 1:  # Just get first batch
             break
         # Convert to numpy and normalize to [0, 255]
-        if dataset_name in ("mnist", "fashion_mnist", "kmnist"):
+        if dataset_name in ("mnist", "fashion_mnist"):
             # Grayscale datasets: data shape [batch, 1, 28, 28]
             config = DATASET_CONFIGS[dataset_name]
             mean = config["transform"].transforms[1].mean[0]
