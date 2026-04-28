@@ -29,6 +29,9 @@ Thumbs.db
 uploads/
 data/raw/
 # backend/data/  # 已包含数据集，需要提交
+# 但忽略超过100MB的大文件
+backend/data/*.tar.gz
+backend/data/cifar-100-python/train
 models/*.pth
 models/*.pt
 
