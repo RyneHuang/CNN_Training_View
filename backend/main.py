@@ -296,15 +296,24 @@ def _load_torchvision_dataset(dataset_name: str, train: bool, transform):
     if ds_cls is None:
         raise ValueError(f"Unknown dataset: {dataset_name}")
 
+    import os
+    # Use absolute path and ensure data directory exists
+    data_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'data')
+    os.makedirs(data_dir, exist_ok=True)
+
     # Try offline first (data bundled in project)
     try:
-        return ds_cls('./data', train=train, download=False, transform=transform)
-    except (RuntimeError, FileNotFoundError, Exception):
-        pass
+        return ds_cls(data_dir, train=train, download=False, transform=transform)
+    except (RuntimeError, FileNotFoundError, Exception) as e:
+        print(f"[Dataset] Offline load failed for {dataset_name}: {type(e).__name__}")
 
     # Fall back to download
-    print(f"[Dataset] Downloading {dataset_name} (train={train})...")
-    return ds_cls('./data', train=train, download=True, transform=transform)
+    print(f"[Dataset] Downloading {dataset_name} (train={train}) to {data_dir}...")
+    try:
+        return ds_cls(data_dir, train=train, download=True, transform=transform)
+    except Exception as e:
+        print(f"[Dataset] Download failed for {dataset_name}: {e}")
+        raise
 
 def get_train_loader(dataset_name: str, batch_size: int, tenant_id: str = None):
     """Get DataLoader for a specific tenant to ensure isolation."""
